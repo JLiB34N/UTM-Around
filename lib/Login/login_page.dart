@@ -82,7 +82,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
-  // --- EMAIL/PASS SIGN IN (Clubs & Admins) ---
+  // --- EMAIL/PASS SIGN IN (Clubs) ---
   Future<void> _signInWithEmail() async {
     // Assuming you created TextEditingControllers named _emailController and _passwordController
     String email = _emailController.text.trim();
@@ -106,7 +106,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       
       // 2. You don't need to do anything else! 
       // The auth_wrapper is already listening and will automatically 
-      // send them to the AdminHomeScreen or Dashboard based on their role!
+      // send them to the Dashboard based on their role!
 
     } on FirebaseAuthException catch (e) {
       // 1. Mount check
@@ -166,7 +166,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ],
                         ),
                       ),
-                      // CLUB & ADMIN TAB
+                      // CLUB TAB
                       Padding(
                         padding: const EdgeInsets.all(20.0),
                         child: Column(

@@ -1,13 +1,32 @@
-// lib/features/club_profile_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:utm_around/constant.dart';
 import 'package:utm_around/Features/event_details.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class ClubProfilePage extends StatelessWidget {
+class ClubProfile extends StatelessWidget {
   final String clubId;
 
-  const ClubProfilePage({super.key, required this.clubId});
+  const ClubProfile({super.key, required this.clubId});
+
+  // --- UPDATED URL LAUNCHER ---
+  Future<void> _launchSocialLink(String? urlString) async {
+    if (urlString == null || urlString.trim().isEmpty) return;
+    
+    // Auto-fix if they forgot the https://
+    if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
+      urlString = 'https://$urlString';
+    }
+    
+    final Uri url = Uri.parse(urlString);
+    try {
+      // FIX: We removed 'canLaunchUrl' because modern phones block it by default!
+      // This will forcefully open the browser.
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("Could not launch link: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +65,15 @@ class ClubProfilePage extends StatelessWidget {
                             : null,
                       ),
                       const SizedBox(height: 16),
-                      Text(clubData['name'] ?? 'Unknown Club', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          clubData['name'] ?? 'Unknown Club', 
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, height: 1.2), 
+                          textAlign: TextAlign.center, 
+                        ),
+                      ),
                       
                       const SizedBox(height: 24),
                       if (clubData['description'] != null && clubData['description'].toString().isNotEmpty) ...[
@@ -61,6 +88,59 @@ class ClubProfilePage extends StatelessWidget {
                         const SizedBox(height: 8),
                         Align(alignment: Alignment.centerLeft, child: Text(clubData['ajk'], style: const TextStyle(color: Colors.black54, height: 1.5))),
                       ],
+                      const SizedBox(height: 24),
+
+                      // --- FOLLOW US SECTION ---
+                      Builder(
+                        builder: (context) {
+                          // 1. Extract the links
+                          String ig = clubData['ig'] ?? '';
+                          String xLink = clubData['x'] ?? '';
+                          String fb = clubData['fb'] ?? '';
+                          String web = clubData['website'] ?? '';
+
+                          // 2. Hide the entire section if the club left everything blank
+                          if (ig.isEmpty && xLink.isEmpty && fb.isEmpty && web.isEmpty) {
+                            return const SizedBox.shrink(); 
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Align(
+                                alignment: Alignment.centerLeft, 
+                                child: Text("Follow Us", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.start, // Align to the left
+                                children: [
+                                  if (ig.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.camera_alt_outlined, color: Colors.pink, size: 28),
+                                      onPressed: () => _launchSocialLink(ig),
+                                    ),
+                                  if (xLink.isNotEmpty)
+                                    IconButton(
+                                      icon: const Text("𝕏", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black)),
+                                      onPressed: () => _launchSocialLink(xLink),
+                                    ),
+                                  if (fb.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.facebook, color: Colors.blue, size: 28),
+                                      onPressed: () => _launchSocialLink(fb),
+                                    ),
+                                  if (web.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.language, color: Colors.green, size: 28),
+                                      onPressed: () => _launchSocialLink(web),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                      ),
                     ],
                   ),
                 ),
@@ -95,6 +175,13 @@ class ClubProfilePage extends StatelessWidget {
                         var doc = events[index];
                         var data = doc.data() as Map<String, dynamic>;
 
+                        // --- NEW: EXTRACTION LOGIC ---
+                        final paymentType = data['paymentType'] ?? 'Free';
+                        final bool isPaid = paymentType == 'Paid';
+                        final paymentColor = isPaid ? Colors.orange : Colors.green;
+                        final paymentIcon = isPaid ? Icons.monetization_on_outlined : Icons.money_off_outlined;
+                        // -----------------------------
+
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                           leading: CircleAvatar(
@@ -104,7 +191,6 @@ class ClubProfilePage extends StatelessWidget {
                           ),
                           title: Text(data['title'] ?? 'Untitled', style: const TextStyle(fontWeight: FontWeight.bold)),
                           
-                          // Safely checks for date, time, and endTime so it never says "null"
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -115,30 +201,44 @@ class ClubProfilePage extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               
-                              // --- NEW: CATEGORY & MODE ROW ---
-                              Row(
+                              // --- UPDATED: Mode + Category + Payment Badge ---
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  // ONLY SHOW CATEGORY IF IT EXISTS
-                                  if (data['category'] != null && data['category'].toString().trim().isNotEmpty) ...[
-                                    Text(
-                                      data['category'].toString().toUpperCase(),
-                                      style: const TextStyle(fontSize: 11, color: utmMaroon, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text("•", style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                    const SizedBox(width: 6),
+                                  Text(data['mode']?.toString().toUpperCase() ?? 'PHYSICAL', style: const TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  
+                                  if (data['category'] != null && data['category'].toString().isNotEmpty) ...[
+                                    const Text("•", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                    Text(data['category'].toString().toUpperCase(), style: const TextStyle(color: utmMaroon, fontSize: 11, fontWeight: FontWeight.bold)),
                                   ],
                                   
-                                  // ALWAYS SHOW MODE (Physical / Online)
-                                  Text(
-                                    data['mode']?.toString().toUpperCase() ?? 'PHYSICAL',
-                                    style: const TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.bold),
+                                  // FREE | PAID BADGE
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    margin: const EdgeInsets.only(left: 4),
+                                    decoration: BoxDecoration(
+                                      color: paymentColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: paymentColor.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(paymentIcon, size: 10, color: paymentColor[800]),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          paymentType.toUpperCase(),
+                                          style: TextStyle(color: paymentColor[800], fontSize: 9, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                             ],
                           ),
-                          // -----------------------
                           
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () {

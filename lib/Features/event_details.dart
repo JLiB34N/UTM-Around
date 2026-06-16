@@ -1,4 +1,3 @@
-// lib/features/event_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +5,9 @@ import 'package:utm_around/constant.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:utm_around/Features/club_profile.dart';
 import 'package:utm_around/Features/notification_service.dart';
+import 'package:utm_around/Features/full_screen_image_viewer.dart'; 
+import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class EventDetails extends StatefulWidget {
   final String eventId;
@@ -58,23 +60,61 @@ class _EventDetailsState extends State<EventDetails> {
       int month = int.parse(dateParts[1]);
       int year = int.parse(dateParts[2]);
 
-      // Time format (Assuming standard 24h format "14:30" or 12h "2:30 PM")
-      // Simple parse for "HH:mm"
+      // --- UPGRADED TIME PARSING LOGIC ---
+      bool isPM = timeStr.toUpperCase().contains('PM');
+      
+      // Now clean the string
+      String cleanTime = timeStr.replaceAll(RegExp(r'[^0-9:]'), ''); 
+      List<String> timeParts = cleanTime.split(':');
+      
       int hour = 0;
       int minute = 0;
       
-      // Let's clean the string just in case
-      timeStr = timeStr.replaceAll(RegExp(r'[^0-9:]'), ''); 
-      List<String> timeParts = timeStr.split(':');
       if (timeParts.length >= 2) {
         hour = int.parse(timeParts[0]);
         minute = int.parse(timeParts[1]);
+        
+        // Convert to 24-hour format so Firebase understands exactly when it is!
+        if (isPM && hour < 12) {
+          hour += 12; // 2 PM becomes 14
+        } else if (!isPM && hour == 12) {
+          hour = 0; // 12 AM becomes 0 (Midnight)
+        }
       }
 
       return DateTime(year, month, day, hour, minute);
     } catch (e) {
       return null; // Return null if parsing fails
     }
+  }
+
+  // --- NEW: ADD TO DEVICE CALENDAR ---
+  void _addToCalendar() {
+    var data = widget.eventData;
+    
+    // Parse Start Time
+    DateTime? startTime = _getEventDateTime(data['date'] ?? '', data['time'] ?? '');
+    
+    // Parse End Time (If it exists, otherwise default to 2 hours after start)
+    DateTime? endTime;
+    if (data['endTime'] != null && data['endTime'].toString().isNotEmpty) {
+      endTime = _getEventDateTime(data['date'] ?? '', data['endTime']);
+    }
+    endTime ??= startTime?.add(const Duration(hours: 2));
+
+    if (startTime == null) return;
+
+    final Event calendarEvent = Event(
+      title: data['title'] ?? 'Event',
+      description: data['description'] ?? '',
+      location: data['location'] ?? (data['mode'] == 'Online' ? data['link'] : ''),
+      startDate: startTime,
+      endDate: endTime!,
+      iosParams: const IOSParams(reminder: Duration(minutes: 60)), // iOS 1 hour reminder
+      androidParams: const AndroidParams(emailInvites: []), // Required for Android
+    );
+
+    Add2Calendar.addEvent2Cal(calendarEvent);
   }
 
   // --- TOGGLE RSVP IN FIRESTORE ---
@@ -89,7 +129,7 @@ class _EventDetailsState extends State<EventDetails> {
 
     try {
       DocumentReference eventRef = FirebaseFirestore.instance.collection('events').doc(widget.eventId);
-
+      
       if (_isAttending) {
         // 1. Add them to the attendees list
         await eventRef.update({'attendees': FieldValue.arrayUnion([user!.uid])});
@@ -101,23 +141,44 @@ class _EventDetailsState extends State<EventDetails> {
         bool notifyPush = userData?['notifyPush'] ?? true;
         List<dynamic> timings = userData?['notifyTimings'] ?? [30, 60]; // Default if they haven't set it
 
+        
         // 3. Schedule the specific Push Notifications
         DateTime? eventDateTime = _getEventDateTime(widget.eventData['date'] ?? '', widget.eventData['time'] ?? '');
         
+        // // --- 15-SECOND SCHEDULER TEST ---
+        // try {
+        //   DateTime testTime = DateTime.now().add(const Duration(seconds: 15));
+        //   print("🕒 SCHEDULING 15-SEC TEST FOR: $testTime");
+          
+        //   await NotificationService().scheduleNotification(
+        //     id: 77777,
+        //     title: "Scheduler is Alive!",
+        //     body: "The time machine works perfectly.",
+        //     scheduledTime: testTime,
+        //   );
+        // } catch (e) {
+        //   print("🕒 SCHEDULER FAILED: $e");
+        // }
+
         if (eventDateTime != null && notifyPush) {
           String eventTitle = widget.eventData['title'] ?? 'Your event';
           
           for (int minutes in timings) {
             // Generate a unique ID for this specific event and timing
-            int notificationId = "${widget.eventId}_$minutes".hashCode;
+            int notificationId = "${widget.eventId}_$minutes".hashCode.abs();
             
             String timeLabel = "";
-            if (minutes == 30) timeLabel = "30 minutes";
-            else if (minutes == 60) timeLabel = "1 hour";
-            else if (minutes == 1440) timeLabel = "1 day";
-            else if (minutes == 4320) timeLabel = "3 days";
+            if (minutes == 30) {
+              timeLabel = "30 minutes";
+            } else if (minutes == 60) {
+              timeLabel = "1 hour";
+            } else if (minutes == 1440) {
+              timeLabel = "1 day";
+            } else if (minutes == 4320) {
+              timeLabel = "3 days";
+            }
 
-            NotificationService().scheduleNotification(
+            await NotificationService().scheduleNotification(
               id: notificationId,
               title: "Reminder: $eventTitle",
               body: "This event is starting in $timeLabel!",
@@ -126,7 +187,22 @@ class _EventDetailsState extends State<EventDetails> {
           }
         }
 
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("RSVP Successful! 🎉"), backgroundColor: Colors.green));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("RSVP Successful! 🎉"), backgroundColor: Colors.green));
+
+          // --- PROMPT TO ADD TO CALENDAR ---
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("Add this to your calendar?"),
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: "Add",
+                textColor: Colors.white,
+                onPressed: _addToCalendar, // Triggers the calendar!
+              ),
+            )
+          );
+        }
       
       } else {
         // Remove them from the list
@@ -222,7 +298,25 @@ class _EventDetailsState extends State<EventDetails> {
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
               background: data['posterUrl'] != null && data['posterUrl'].toString().isNotEmpty
-                  ? Image.network(data['posterUrl'], fit: BoxFit.cover)
+                  // --- NEW: GESTURE DETECTOR & HERO ---
+                  ? GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FullScreenImageViewer(
+                              imageUrl: data['posterUrl'],
+                              heroTag: 'poster_${widget.eventId}', // Link to this specific event!
+                            ),
+                          ),
+                        );
+                      },
+                      child: Hero(
+                        tag: 'poster_${widget.eventId}',
+                        child: Image.network(data['posterUrl'], fit: BoxFit.cover),
+                      ),
+                    )
+                  // ------------------------------------
                   : Container(
                       color: utmMaroon.withValues(alpha: 0.8),
                       child: const Center(child: Icon(Icons.event, color: Colors.white, size: 80)),
@@ -237,12 +331,12 @@ class _EventDetailsState extends State<EventDetails> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Multiple Tags Wrap
-                  if (data['tags'] != null) 
+                  // 1. Multiple Tags Wrap
+                  if (data['tag'] != null) ...[
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: (data['tags'] as List).map((tag) {
+                      children: (data['tag'] as List).map((tag) {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
@@ -257,6 +351,52 @@ class _EventDetailsState extends State<EventDetails> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // 2. FIXED BADGES ROW (MODE & FEE STATUS)
+                  Row(
+                    children: [
+                      // Mode Badge (Physical / Online)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          data['mode']?.toString().toUpperCase() ?? 'PHYSICAL',
+                          style: const TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Payment Fee Badge (Free / Paid)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (data['paymentType'] == 'Paid') 
+                              ? Colors.orange.withValues(alpha: 0.1) 
+                              : Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: (data['paymentType'] == 'Paid') 
+                                ? Colors.orange.withValues(alpha: 0.3) 
+                                : Colors.green.withValues(alpha: 0.3)
+                          ),
+                        ),
+                        child: Text(
+                          (data['paymentType'] ?? 'Free').toString().toUpperCase(),
+                          style: TextStyle(
+                            color: (data['paymentType'] == 'Paid') ? Colors.orange[800] : Colors.green[800], 
+                            fontSize: 11, 
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
                   // Title
                   Text(
@@ -267,7 +407,7 @@ class _EventDetailsState extends State<EventDetails> {
 
                   // Info Rows (Date, Time, Location)
                   _buildInfoRow(Icons.calendar_today, "Date", data['date'] ?? 'TBA'),
-                  const SizedBox(height: 16),
+                  //const SizedBox(height: 16),
                   _buildInfoRow(
                     Icons.access_time, 
                     "Time", 
@@ -278,8 +418,8 @@ class _EventDetailsState extends State<EventDetails> {
                   _buildInfoRow(Icons.location_on, "Location", data['location'] ?? 'TBA'),
                   const SizedBox(height: 12),
                   
-                  // NEW: DYNAMIC ACTION BUTTON FOR LINKS
-                  if (data['link'] != null && data['link'].toString().isNotEmpty)
+                  // DYNAMIC ACTION BUTTON FOR LINKS
+                  if (data['link'] != null && data['link'].toString().isNotEmpty) ...[
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -294,9 +434,68 @@ class _EventDetailsState extends State<EventDetails> {
                         onPressed: () => _launchURL(data['link']),
                       ),
                     ),
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 16),
+                  ],
 
-                  // --- NEW: HOSTED BY SECTION ---
+                  // --- DEDICATED PAYMENT BUTTON ---
+                  if (data['paymentType'] == 'Paid' && data['paymentLink'] != null && data['paymentLink'].toString().isNotEmpty) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange[700],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.shopping_cart_checkout),
+                        label: const Text("Complete Payment / Get Tickets", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        onPressed: () => _launchURL(data['paymentLink']),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // --- UPDATED: PAID EVENT NOTICE BANNER ---
+                  if (data['paymentType'] == 'Paid') ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.05),
+                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orange[800], size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Paid Event Notice", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange[800], fontSize: 14)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  data['paymentLink'] != null && data['paymentLink'].toString().isNotEmpty
+                                      ? "This event requires an entry fee. Clicking 'RSVP Now' below only bookmarks it in your schedule. Please use the orange button above to complete your official registration!"
+                                      : "This event requires an entry fee. Please check the description or contact the organizers regarding payment instructions.",
+                                  style: TextStyle(color: Colors.grey[800], fontSize: 13, height: 1.4),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  const SizedBox(height: 16),//padding
+
+                  // --- HOSTED BY SECTION ---
                   if (data['clubId'] != null)
                     FutureBuilder<DocumentSnapshot>(
                       future: FirebaseFirestore.instance.collection('users').doc(data['clubId']).get(),
@@ -310,7 +509,7 @@ class _EventDetailsState extends State<EventDetails> {
                             // Navigate to the new Club Profile Page!
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => ClubProfilePage(clubId: data['clubId'])),
+                              MaterialPageRoute(builder: (context) => ClubProfile(clubId: data['clubId'])),
                             );
                           },
                           child: Container(

@@ -29,7 +29,7 @@ const List<String> eventCategories = [
 ];
 
 // List of UTM Faculties
-  final List<String> utmFaculties = [
+  const List<String> utmFaculties = [
     'FC (Computing)', 
     'FKE (Electrical)', 
     'FKA (Civil)', 

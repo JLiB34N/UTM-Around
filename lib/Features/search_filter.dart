@@ -1,4 +1,3 @@
-// lib/features/search_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:utm_around/constant.dart';
@@ -13,17 +12,23 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   String _searchQuery = "";
-  
-  // 1. Change from a single DateTime to a DateTimeRange!
   DateTimeRange? _selectedDateRange;
+  
+  // --- FILTER STATES ---
+  String _selectedMode = 'All Modes';
+  String _selectedPayment = 'All Fees';
 
   // --- SHOW DATE RANGE PICKER ---
   Future<void> _pickDateRange() async {
+    // 1. Grab the current year dynamically!
+    final int currentYear = DateTime.now().year;
+
     DateTimeRange? picked = await showDateRangePicker(
       context: context,
       initialDateRange: _selectedDateRange,
-      firstDate: DateTime(2023), // Allow searching past events too!
-      lastDate: DateTime(2030),
+      // 2. Future-proof boundaries based on your logic:
+      firstDate: DateTime(currentYear - 8), // 8 years ago
+      lastDate: DateTime(currentYear + 1, 12, 31), // December 31st of next year
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -50,6 +55,21 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _selectedDateRange = null;
     });
+  }
+
+  // --- NEW: Helper to check if an event is today or in the future ---
+  bool _isUpcoming(String dateStr) {
+    try {
+      List<String> parts = dateStr.split('/');
+      if (parts.length == 3) {
+        DateTime eventDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+        DateTime todayMidnight = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+        return !eventDate.isBefore(todayMidnight); 
+      }
+    } catch (e) {
+      return false; // If date is broken, hide it
+    }
+    return false;
   }
 
   // Helper to check if the event falls BETWEEN the selected dates
@@ -88,6 +108,7 @@ class _SearchPageState extends State<SearchPage> {
         title: const Text("Search Events", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: utmMaroon,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
         children: [
@@ -148,6 +169,57 @@ class _SearchPageState extends State<SearchPage> {
                     ]
                   ],
                 ),
+                const SizedBox(height: 12),
+
+                // --- 3. NEW: MODE & FEE DROPDOWNS ---
+                Row(
+                  children: [
+                    // Mode Dropdown
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: _selectedMode,
+                            icon: const Icon(Icons.arrow_drop_down, color: utmMaroon),
+                            items: ['All Modes', 'Physical', 'Online'].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) => setState(() => _selectedMode = newValue!),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Fee Dropdown
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: _selectedPayment,
+                            icon: const Icon(Icons.arrow_drop_down, color: utmMaroon),
+                            items: ['All Fees', 'Free', 'Paid'].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) => setState(() => _selectedPayment = newValue!),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // ------------------------------------
               ],
             ),
           ),
@@ -168,18 +240,35 @@ class _SearchPageState extends State<SearchPage> {
                   String title = (data['title'] ?? '').toLowerCase();
                   String location = (data['location'] ?? '').toLowerCase();
                   String eventDateStr = data['date'] ?? '';
-                  List<dynamic> rawTags = data['tags'] ?? [];
+                  String mode = data['mode'] ?? 'Physical';
+                  String paymentType = data['paymentType'] ?? 'Free';
+
+                  // Safely check for tags (handles both 'tag' array and old 'tags' array)
+                  List<dynamic> rawTags = data['tag'] ?? data['tags'] ?? [];
                   String allTagsText = rawTags.join(" ").toLowerCase();
 
-                  // 1. Text Check (Fixed typo here!)
+                  // 1. Text Check
                   bool matchesText = title.contains(_searchQuery) || 
                                      location.contains(_searchQuery) || 
                                      allTagsText.contains(_searchQuery); 
 
-                  // 2. Date Range Check
-                  bool matchesDate = _matchesDateFilter(eventDateStr);
+                  // --- SMART DATE LOGIC ---
+                  bool matchesDate;
+                  if (_selectedDateRange == null) {
+                    // If they haven't picked a date filter, ONLY show upcoming/today events! (Hide the past)
+                    matchesDate = _isUpcoming(eventDateStr);
+                  } else {
+                    // If they picked a specific date range, use that! (Allows searching past events)
+                    matchesDate = _matchesDateFilter(eventDateStr);
+                  }
 
-                  return matchesText && matchesDate;
+                  // 3. Mode Check
+                  bool matchesMode = _selectedMode == 'All Modes' || mode.toLowerCase() == _selectedMode.toLowerCase();
+
+                  // 4. Fee Check
+                  bool matchesPayment = _selectedPayment == 'All Fees' || paymentType.toLowerCase() == _selectedPayment.toLowerCase();
+
+                  return matchesText && matchesDate && matchesMode && matchesPayment;
                 }).toList();
 
                 if (filteredEvents.isEmpty) {
@@ -202,6 +291,12 @@ class _SearchPageState extends State<SearchPage> {
                   itemBuilder: (context, index) {
                     var doc = filteredEvents[index];
                     var data = doc.data() as Map<String, dynamic>;
+
+                    // --- EXTRACTION LOGIC FOR UI ---
+                    final paymentType = data['paymentType'] ?? 'Free';
+                    final bool isPaid = paymentType == 'Paid';
+                    final paymentColor = isPaid ? Colors.orange : Colors.green;
+                    // -------------------------------
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -227,35 +322,49 @@ class _SearchPageState extends State<SearchPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 4),
-                            // --- UPDATED: Date & Time with End Time ---
+                            // Date & Time
                             Text(
                               "${data['date'] ?? 'TBA'} • ${data['time'] ?? 'TBA'} - ${data['endTime'] ?? 'TBA'}", 
                               style: const TextStyle(color: utmMaroon, fontSize: 12, fontWeight: FontWeight.w600),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             
-                            // --- NEW: Category and Mode Row ---
-                            Row(
+                            // --- UPDATED: BADGES & TAGS WRAP ---
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                // ONLY show category if it exists
-                                if (data['category'] != null && data['category'].toString().trim().isNotEmpty) ...[
-                                  Text(
-                                    data['category'].toString().toUpperCase(), 
-                                    style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text("•", style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                  const SizedBox(width: 6),
-                                ],
-                                // ALWAYS show Mode (Physical/Online)
-                                Text(
-                                  data['mode']?.toString().toUpperCase() ?? 'PHYSICAL',
-                                  style: const TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.bold),
+                                // 1. Mode Badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                                  child: Text(data['mode']?.toString().toUpperCase() ?? 'PHYSICAL', style: const TextStyle(color: Colors.blue, fontSize: 9, fontWeight: FontWeight.bold)),
                                 ),
+                                // 2. Fee Badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: paymentColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: paymentColor.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(paymentType.toUpperCase(), style: TextStyle(color: paymentColor[800], fontSize: 9, fontWeight: FontWeight.bold)),
+                                ),
+                                // 3. Dynamic Tags (Limit to 2 so the card doesn't get huge)
+                                if (data['tag'] != null)
+                                  ...((data['tag'] as List).take(2).map((tag) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: utmMaroon.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                                      child: Text(tag.toString().toUpperCase(), style: const TextStyle(color: utmMaroon, fontSize: 9, fontWeight: FontWeight.bold)),
+                                    );
+                                  })),
                               ],
                             ),
+                            // ------------------------------------
                           ],
                         ),
                         trailing: const Icon(Icons.chevron_right, color: Colors.grey),

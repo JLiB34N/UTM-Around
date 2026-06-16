@@ -1,11 +1,9 @@
-// lib/auth_wrapper.dart (STUDENT APP)
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'login_page.dart';
+import 'login_page.dart' hide utmMaroon;
 import 'package:utm_around/Features/dashboard_screen.dart'; 
-
-const Color utmMaroon = Color(0xFF981D2D);
+import 'package:utm_around/constant.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});

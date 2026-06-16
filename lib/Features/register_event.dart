@@ -1,4 +1,4 @@
-import 'dart:io'; // Needed for the File object
+import 'dart:io'; 
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,7 +21,9 @@ class _RegisterEventState extends State<RegisterEvent> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   String _eventMode = 'Physical';
+  String _paymentType = 'Free';
   final TextEditingController _linkController = TextEditingController(); // Holds either Maps link or Meet link
+  final TextEditingController _paymentLinkController = TextEditingController();
 
   // State Variables
   //String? _selectedCategory; // For the dropdown
@@ -203,6 +205,8 @@ class _RegisterEventState extends State<RegisterEvent> {
         'endTime': formattedEndTime,
         'tag': _selectedTags, 
         'mode': _eventMode, 
+        'paymentType': _paymentType,
+        'paymentLink': _paymentType == 'Paid' ? _paymentLinkController.text.trim() : '',
         'location': _eventMode == 'Physical' ? _locationController.text.trim() : 'Online Meeting',
         'link': _linkController.text.trim(), 
         'posterUrl': posterUrl,
@@ -338,6 +342,72 @@ class _RegisterEventState extends State<RegisterEvent> {
               ),
               const SizedBox(height: 20),
 
+              // --- NEW: FREE OR PAID TOGGLE ---
+              const Text("Event Fee", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: _paymentType == 'Free' ? utmMaroon : Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                        color: _paymentType == 'Free' ? utmMaroon.withValues(alpha: 0.05) : Colors.transparent,
+                      ),
+                      child: RadioListTile<String>(
+                        title: const Text('Free', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        value: 'Free',
+                        groupValue: _paymentType,
+                        activeColor: utmMaroon,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (value) => setState(() => _paymentType = value!),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: _paymentType == 'Paid' ? utmMaroon : Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                        color: _paymentType == 'Paid' ? utmMaroon.withValues(alpha: 0.05) : Colors.transparent,
+                      ),
+                      child: RadioListTile<String>(
+                        title: const Text('Paid', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        value: 'Paid',
+                        groupValue: _paymentType,
+                        activeColor: utmMaroon,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (value) => setState(() => _paymentType = value!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              // --- IF PAID: SHOW PAYMENT LINK BOX ---
+              if (_paymentType == 'Paid') ...[
+                const SizedBox(height: 16),
+                const Text("Payment / Ticketing Link", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _paymentLinkController,
+                  validator: (val) => val == null || val.isEmpty ? "Payment link is required for paid events." : null,
+                  decoration: InputDecoration(
+                    hintText: "e.g. Google Form",
+                    prefixIcon: const Icon(Icons.payment, color: Colors.orange),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.orange, width: 2)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Student will click this to pay. Your RSVP button will just act as a bookmark.",
+                  style: TextStyle(color: Colors.grey, fontSize: 11, fontStyle: FontStyle.italic),
+                )
+              ],
+              const SizedBox(height: 20),
+
               // --- DYNAMIC TAG SYSTEM ---
               const Text("Event Tags (Max 5)", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
@@ -391,7 +461,7 @@ class _RegisterEventState extends State<RegisterEvent> {
               ),
               const SizedBox(height: 12),
               
-              // 3. Show their currently selected custom tags (with delete buttons)
+              // 3. Show currently selected custom tags (with delete buttons)
               Wrap(
                 spacing: 8.0,
                 runSpacing: -8.0,
@@ -408,22 +478,6 @@ class _RegisterEventState extends State<RegisterEvent> {
 
               // --- DYNAMIC FIELDS BASED ON MODE ---
               if (_eventMode == 'Physical') ...[
-                // Category Dropdown (Only show if Physical, since Online forces the Online category)
-                // const Text("Category", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                // const SizedBox(height: 8),
-                // DropdownButtonFormField<String>(
-                //   initialValue: _selectedCategory,
-                //   validator: (val) => val == null ? "Required" : null,
-                //   decoration: InputDecoration(
-                //     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                //     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: utmMaroon, width: 2)),
-                //   ),
-                //   hint: const Text("Select Category"),
-                //   items: eventCategories.where((c) => c != 'Online').map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(), // Hide 'Online' from this dropdown
-                //   onChanged: (val) => setState(() => _selectedCategory = val),
-                // ),
-                // const SizedBox(height: 20),
-
                 const Text("Venue Name", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -484,7 +538,7 @@ class _RegisterEventState extends State<RegisterEvent> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // --- START & END TIME PICKERS (Side by side) ---
               Row(
@@ -546,23 +600,8 @@ class _RegisterEventState extends State<RegisterEvent> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // // Location
-              // const Text("Location / Venue", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              // const SizedBox(height: 8),
-              // TextFormField(
-              //   controller: _locationController,
-              //   validator: (val) => val == null || val.isEmpty ? "Required" : null,
-              //   decoration: InputDecoration(
-              //     hintText: "e.g. Dewan Sultan Iskandar",
-              //     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              //     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: utmMaroon, width: 2)),
-              //   ),
-              // ),
-              // const SizedBox(height: 20),
-
-              // --- DYNAMIC CONTACT PERSONS ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -580,6 +619,7 @@ class _RegisterEventState extends State<RegisterEvent> {
               
               ListView.builder(
                 shrinkWrap: true,
+                padding: EdgeInsets.zero,
                 physics: const NeverScrollableScrollPhysics(), // Let the main page handle scrolling
                 itemCount: _contactControllers.length,
                 itemBuilder: (context, index) {
@@ -632,7 +672,7 @@ class _RegisterEventState extends State<RegisterEvent> {
                   );
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(width: 24),
 
               // Description
               const Text("Description", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -647,7 +687,7 @@ class _RegisterEventState extends State<RegisterEvent> {
                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: utmMaroon, width: 2)),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 30),
 
               // Submit Button
               SizedBox(
@@ -666,7 +706,7 @@ class _RegisterEventState extends State<RegisterEvent> {
                       : const Text("Submit for Approval", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
             ],
           ),
         ),

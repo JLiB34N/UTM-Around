@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,6 +13,12 @@ class NotificationService {
   Future<void> init() async {
     // Initialize TimeZones
     tz.initializeTimeZones();
+
+    // 2. Fetch the TimeZoneInfo object from the device
+    final TimezoneInfo currentTimeZone = await FlutterTimezone.getLocalTimezone();
+
+    // 3. Extract the string identifier (e.g., "Asia/Kuala_Lumpur") and set the location!
+    tz.setLocalLocation(tz.getLocation(currentTimeZone.identifier));
 
     // Android Setup
     const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -29,6 +36,16 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
+
+    // Request Android 13+ Notification Permission
+    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+      await androidImplementation.requestExactAlarmsPermission();
+    }
   }
 
   // Schedule Notification
@@ -59,11 +76,12 @@ class NotificationService {
       scheduledDate: tz.TZDateTime.from(scheduledTime, tz.local),
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'event_reminders', 
+          'event_reminders_v2', // <--- THE MAGIC FIX: A brand new channel ID!
           'Event Reminders',
           channelDescription: 'Reminders for your upcoming events',
           importance: Importance.max,
           priority: Priority.high,
+          icon: '@mipmap/ic_launcher', // Make sure this is here just in case!
         ),
         iOS: DarwinNotificationDetails(),
       ),

@@ -16,9 +16,19 @@ class EditProfile extends StatefulWidget {
 class _EditProfileState extends State<EditProfile> {
   final User? user = FirebaseAuth.instance.currentUser;
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+  final TextEditingController _ajkController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _progController = TextEditingController();
+  final TextEditingController _igController = TextEditingController();
+  final TextEditingController _xController = TextEditingController();
+  final TextEditingController _fbController = TextEditingController();
+  final TextEditingController _webController = TextEditingController();
   
   String? _selectedFaculty;
-  String? _existingProfilePicUrl; // To hold their current picture from Firestore
+  String? _existingProfilePicUrl; // To hold current picture from Firestore
+  String? _userRole; // To track if they are a student or club
+  String? _selectedResidency;
   
   // Image Picker Variables
   File? _profileImage;
@@ -27,33 +37,42 @@ class _EditProfileState extends State<EditProfile> {
   bool _isLoading = true;
   bool _isSaving = false;
 
+  final List<String> _residencyOptions = [
+    'KTDI', 'KDSE', 'K9 & K10', 'KDOJ', 'KTR', 'KTC', 'KTHO', 'KTF', 'KRP', 'KP', 'Outside UTM'
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
   }
   
-  // Add these new controllers at the top of your state class
-  final TextEditingController _descController = TextEditingController();
-  final TextEditingController _ajkController = TextEditingController();
-  String? _userRole; // To track if they are a student or club
-
   Future<void> _loadUserData() async {
     if (user != null) {
       DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user!.uid).get();
       if (doc.exists) {
         var data = doc.data() as Map<String, dynamic>;
         setState(() {
-          _userRole = data['role'] ?? 'student'; // Get their role!
+          _userRole = data['role'] ?? 'student'; // Get role
           _nameController.text = data['name'] ?? '';
+          _phoneController.text = data['phone'] ?? '';
           _existingProfilePicUrl = data['profilePic'];
           
           if (_userRole == 'club') {
             _descController.text = data['description'] ?? '';
             _ajkController.text = data['ajk'] ?? '';
+            _igController.text = data['ig'] ?? '';
+            _xController.text = data['x'] ?? '';
+            _fbController.text = data['fb'] ?? '';
+            _webController.text = data['website'] ?? '';
           } else {
             if (utmFaculties.contains(data['faculty'])) {
               _selectedFaculty = data['faculty'];
+            }
+            _progController.text = data['programme'] ?? '';
+            
+            if (_residencyOptions.contains(data['residency'])) {
+              _selectedResidency = data['residency'];
             }
           }
           _isLoading = false;
@@ -103,14 +122,21 @@ class _EditProfileState extends State<EditProfile> {
       // Change the Firestore update block to this:
       Map<String, dynamic> updateData = {
         'name': _nameController.text.trim(),
+        'phone': _phoneController.text.trim(),
         'profilePic': finalPicUrl ?? '',
       };
 
       if (_userRole == 'club') {
         updateData['description'] = _descController.text.trim();
         updateData['ajk'] = _ajkController.text.trim();
+        updateData['ig'] = _igController.text.trim();
+        updateData['x'] = _xController.text.trim();
+        updateData['fb'] = _fbController.text.trim();
+        updateData['website'] = _webController.text.trim();
       } else {
         updateData['faculty'] = _selectedFaculty ?? 'Not set';
+        updateData['programme'] = _progController.text.trim().toUpperCase(); // Auto uppercase 
+        updateData['residency'] = _selectedResidency ?? 'Not set';
       }
 
       await FirebaseFirestore.instance.collection('users').doc(user!.uid).update(updateData);
@@ -130,6 +156,8 @@ class _EditProfileState extends State<EditProfile> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
+    _progController.dispose();
     super.dispose();
   }
 
@@ -206,8 +234,49 @@ class _EditProfileState extends State<EditProfile> {
             ),
             const SizedBox(height: 24),
 
+            // --- PHONE NUMBER FIELD ---
+            const Text("Phone Number", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone, // Pops up the number pad on their phone!
+              decoration: InputDecoration(
+                hintText: "e.g. 0123456789",
+                prefixIcon: const Icon(Icons.phone, color: utmMaroon),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: utmMaroon, width: 2)),
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // --- DYNAMIC FIELDS BASED ON ROLE ---
             if (_userRole == 'club') ...[
+              const SizedBox(height: 10),
+              const Text("Social Media Links (Optional)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text("Paste the full link (e.g. https://instagram.com/myclub)", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const SizedBox(height: 16),
+              
+              TextField(
+                controller: _igController,
+                decoration: InputDecoration(hintText: "Instagram Link", prefixIcon: const Icon(Icons.camera_alt_outlined, color: Colors.pink), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _xController,
+                decoration: InputDecoration(hintText: "X (Twitter) Link", prefixIcon: const Icon(Icons.alternate_email, color: Colors.black), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _fbController,
+                decoration: InputDecoration(hintText: "Facebook Link", prefixIcon: const Icon(Icons.facebook, color: Colors.blue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _webController,
+                decoration: InputDecoration(hintText: "Website or WhatsApp Link", prefixIcon: const Icon(Icons.language, color: Colors.green), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+              const SizedBox(height: 24),
+              
               const Text("Club Description", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               TextField(
@@ -220,6 +289,7 @@ class _EditProfileState extends State<EditProfile> {
                 ),
               ),
               const SizedBox(height: 24),
+
               const Text("Committee Members (AJK)", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               TextField(
@@ -232,7 +302,6 @@ class _EditProfileState extends State<EditProfile> {
                 ),
               ),
             ] else ...[
-              // Put your existing Faculty Dropdown UI here!
               const Text("Faculty", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               Container(
@@ -261,8 +330,44 @@ class _EditProfileState extends State<EditProfile> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // 2. Year & Programme Code TextField
+              const Text("Year & Programme Code", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _progController,
+                textCapitalization: TextCapitalization.characters, // Suggests uppercase keyboard
+                decoration: InputDecoration(
+                  hintText: "e.g. 4/SECRH",
+                  prefixIcon: const Icon(Icons.school_outlined, color: utmMaroon),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: utmMaroon, width: 2)),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 3. NEW: Residential Area Dropdown
+              const Text("Residential Area", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(12)),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    hint: const Text("Select your College / Area"),
+                    value: _selectedResidency,
+                    icon: const Icon(Icons.apartment, color: utmMaroon),
+                    items: _residencyOptions.map((String res) => DropdownMenuItem<String>(value: res, child: Text(res))).toList(),
+                    onChanged: (newValue) => setState(() => _selectedResidency = newValue),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
             ],
-            const SizedBox(height: 40),
+
+            const SizedBox(height: 24),
 
             // --- SAVE BUTTON ---
             SizedBox(
@@ -281,6 +386,7 @@ class _EditProfileState extends State<EditProfile> {
                     : const Text("Save Changes", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
+            const SizedBox(height: 32),
           ],
         ),
       ),

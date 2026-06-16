@@ -19,7 +19,6 @@ class _NotificationPreferencesState extends State<NotificationPreferences> {
 
   // Notification Methods
   bool _notifyPush = true;
-  bool _notifyEmail = false;
 
   // Timings (stored in minutes)
   final List<int> _availableTimings = [30, 60, 1440, 4320];
@@ -38,7 +37,6 @@ class _NotificationPreferencesState extends State<NotificationPreferences> {
         var data = doc.data() as Map<String, dynamic>;
         setState(() {
           _notifyPush = data['notifyPush'] ?? true;
-          _notifyEmail = data['notifyEmail'] ?? false;
           
           if (data['notifyTimings'] != null) {
             _selectedTimings = List<int>.from(data['notifyTimings']);
@@ -56,7 +54,6 @@ class _NotificationPreferencesState extends State<NotificationPreferences> {
     try {
       await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({
         'notifyPush': _notifyPush,
-        'notifyEmail': _notifyEmail,
         'notifyTimings': _selectedTimings,
       });
       if (mounted) {
@@ -93,7 +90,12 @@ class _NotificationPreferencesState extends State<NotificationPreferences> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: utmMaroon, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: utmMaroon, 
+              foregroundColor: Colors.white, 
+              minimumSize: const Size(double.infinity, 50), 
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+            ),
             onPressed: _isLoading || _isSaving ? null : _savePreferences,
             child: _isSaving 
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
@@ -110,24 +112,12 @@ class _NotificationPreferencesState extends State<NotificationPreferences> {
               const SizedBox(height: 12),
               Container(
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      title: const Text("Push Notifications", style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text("Alerts on your phone screen"),
-                      activeColor: utmMaroon,
-                      value: _notifyPush,
-                      onChanged: (val) => setState(() => _notifyPush = val),
-                    ),
-                    const Divider(height: 1),
-                    SwitchListTile(
-                      title: const Text("Email Reminders", style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text("Sent to your registered email"),
-                      activeColor: utmMaroon,
-                      value: _notifyEmail,
-                      onChanged: (val) => setState(() => _notifyEmail = val),
-                    ),
-                  ],
+                child: SwitchListTile(
+                  title: const Text("Push Notifications", style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text("Alerts on your phone screen"),
+                  activeColor: utmMaroon,
+                  value: _notifyPush,
+                  onChanged: (val) => setState(() => _notifyPush = val),
                 ),
               ),
 

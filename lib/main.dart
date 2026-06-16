@@ -1,11 +1,8 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:utm_around/Login/auth_wrapper.dart';
 import 'Features/notification_service.dart';
-
-// Define your global UTM Maroon color here so it's accessible anywhere if needed
-const Color utmMaroon = Color(0xFF981D2D);
+import 'constant.dart';
 
 void main() async {
   // Required to ensure Flutter framework is fully loaded before initializing Firebase

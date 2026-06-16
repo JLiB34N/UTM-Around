@@ -36,20 +36,52 @@ class _MainFeedState extends State<MainFeed> {
       }
     }
   }
-  // Helper to check if an event is in the future
-  bool _isUpcoming(String dateStr) {
+  // // Helper to check if an event is in the future
+  // bool _isUpcoming(String dateStr) {
+  //   try {
+  //     List<String> parts = dateStr.split('/');
+  //     if (parts.length == 3) {
+  //       DateTime eventDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+  //       DateTime todayMidnight = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+  //       // Returns true if the event is today or in the future
+  //       return !eventDate.isBefore(todayMidnight); 
+  //     }
+  //   } catch (e) {
+  //     return false; // If date is broken, hide it to be safe
+  //   }
+  //   return false;
+  // }
+
+  bool _isEventPassed(String? dateStr, String? timeStr) {
+    if (dateStr == null || dateStr.isEmpty) return false;
+    
     try {
-      List<String> parts = dateStr.split('/');
-      if (parts.length == 3) {
-        DateTime eventDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
-        DateTime todayMidnight = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-        // Returns true if the event is today or in the future
-        return !eventDate.isBefore(todayMidnight); 
+      List<String> dateParts = dateStr.split('/');
+      int day = int.parse(dateParts[0]);
+      int month = int.parse(dateParts[1]);
+      int year = int.parse(dateParts[2]);
+
+      int hour = 23;
+      int minute = 59;
+
+      if (timeStr != null && timeStr.isNotEmpty) {
+        bool isPM = timeStr.toUpperCase().contains('PM');
+        String cleanTime = timeStr.replaceAll(RegExp(r'[^0-9:]'), '');
+        List<String> timeParts = cleanTime.split(':');
+        
+        if (timeParts.length >= 2) {
+          hour = int.parse(timeParts[0]);
+          minute = int.parse(timeParts[1]);
+          if (isPM && hour < 12) hour += 12;
+          else if (!isPM && hour == 12) hour = 0;
+        }
       }
+
+      DateTime eventDate = DateTime(year, month, day, hour, minute);
+      return eventDate.isBefore(DateTime.now());
     } catch (e) {
-      return false; // If date is broken, hide it to be safe
+      return false; 
     }
-    return false;
   }
 
   @override
@@ -109,13 +141,13 @@ class _MainFeedState extends State<MainFeed> {
                 var approvedUpcomingEvents = allEvents.where((doc) {
                   var data = doc.data() as Map<String, dynamic>;
                   String status = data['status'] ?? 'pending';
-                  String date = data['date'] ?? '';
                   
                   // ONLY keep it if it is Approved AND hasn't happened yet!
-                  return status == 'approved' && _isUpcoming(date);
+                  // --- CHANGED THIS LINE ---
+                  return status == 'approved' && !_isEventPassed(data['date'], data['time']);
                 }).toList();
 
-                // --- NEW SUPER-SORTING LOGIC ---
+                // --- SUPER-SORTING LOGIC ---
                 // Put preferred events at the top, then sort by newest!
                 approvedUpcomingEvents.sort((a, b) {
                   var dataA = a.data() as Map<String, dynamic>;
@@ -135,7 +167,7 @@ class _MainFeedState extends State<MainFeed> {
 
                     // 3. Move preferred events to the top
                     if (aHasPreferred && !bHasPreferred) return -1; // A moves up
-                    if (!aHasPreferred && bHasPreferred) return 1;  // B moves up
+                    if (!aHasPreferred && bHasPreferred) return 1; // B moves up
                   }
 
                   // 4. TIE-BREAKER: If both are preferred (or neither are), sort by newest!
@@ -156,6 +188,16 @@ class _MainFeedState extends State<MainFeed> {
                     var doc = approvedUpcomingEvents[index];
                     var data = doc.data() as Map<String, dynamic>;
 
+                    // --- CORRECT LOCATION FOR EXTRACTION LOGIC ---
+                    // This logic now runs once per item, making the variables available for the Card!
+                    // Extract paymentType and define style locally
+                    // Use modern green for Free and Orange for Paid to align with standard UI patterns
+                    final paymentType = data['paymentType'] ?? 'Free'; // Default to free for safety/legacy events
+                    final bool isPaid = paymentType == 'Paid';
+                    final paymentColor = isPaid ? Colors.orange : Colors.green;
+                    final paymentIcon = isPaid ? Icons.monetization_on_outlined : Icons.money_off_outlined;
+                    // ---------------------------------------------
+
                     return GestureDetector(
                       onTap: () {
                         // Navigate to the Details Page, passing the specific Document ID and Data!
@@ -167,8 +209,8 @@ class _MainFeedState extends State<MainFeed> {
                               eventData: data, // We pass the data so the next page loads instantly!
                             ),
                           ),
-                      );
-                    },
+                        );
+                      },
                       child: Card(
                         margin: const EdgeInsets.only(bottom: 20),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -201,13 +243,16 @@ class _MainFeedState extends State<MainFeed> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Tags Row (Category + Mode)
-                                  Row(
+                                  // --- UPDATED: Switched from Row to Wrap to gracefully handle potential overflow with the new badge ---
+                                  Wrap(
+                                    spacing: 8, // Horizontal spacing between badges
+                                    runSpacing: 4, // Vertical spacing if it wraps to a new line
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
                                       // --- ONLY SHOW CATEGORY IF IT ACTUALLY EXISTS ---
                                       if (data['category'] != null && data['category'].toString().trim().isNotEmpty)
                                         Container(
-                                          margin: const EdgeInsets.only(right: 8), // Moved the spacing here!
+                                          // Note: The margin is now handled by the 'spacing' prop of the parent Wrap widget!
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: utmMaroon.withValues(alpha: 0.1),
@@ -231,6 +276,28 @@ class _MainFeedState extends State<MainFeed> {
                                           style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
                                         ),
                                       ),
+
+                                      // --- THE NEW PAYMENT TYPE BADGE (It works now!) ---
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: paymentColor.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: paymentColor.withValues(alpha: 0.3)), // Subtle border for definition
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min, // Container tight around content
+                                          children: [
+                                            Icon(paymentIcon, size: 12, color: paymentColor[800]), // Darker shade for contrast
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              paymentType.toUpperCase(),
+                                              style: TextStyle(color: paymentColor[800], fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // --------------------------------------------------
                                     ],
                                   ),
                                   const SizedBox(height: 8),
@@ -244,7 +311,7 @@ class _MainFeedState extends State<MainFeed> {
                                   ),
                                   const SizedBox(height: 12),
                                   
-                                  // --- UPDATED: Date & Time (Now includes End Time!) ---
+                                  // Date & Time (End time has been added for completeness)
                                   Row(
                                     children: [
                                       const Icon(Icons.access_time, size: 16, color: Colors.grey),
@@ -260,7 +327,7 @@ class _MainFeedState extends State<MainFeed> {
                                   ),
                                   const SizedBox(height: 6),
                                   
-                                  // --- UPDATED: Location (Changes icon if Online) ---
+                                  // Location (Now dynamically changes icon if Online)
                                   Row(
                                     children: [
                                       Icon(
@@ -276,7 +343,7 @@ class _MainFeedState extends State<MainFeed> {
                                         ),
                                       ),
                                     ],
-                                  ),
+                                 ),
                                 ],
                               ),
                             )

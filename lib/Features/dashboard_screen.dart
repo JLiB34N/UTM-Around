@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'main_feed_page.dart'; // Import your feed
-import 'settings.dart';  // Import your settings
+import 'main_feed_page.dart'; 
+import 'settings.dart'; 
 import 'search_filter.dart'; 
 import 'package:utm_around/constant.dart';
 
