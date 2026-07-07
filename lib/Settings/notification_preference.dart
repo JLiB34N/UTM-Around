@@ -115,7 +115,7 @@ class _NotificationPreferencesState extends State<NotificationPreferences> {
                 child: SwitchListTile(
                   title: const Text("Push Notifications", style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: const Text("Alerts on your phone screen"),
-                  activeColor: utmMaroon,
+                  activeThumbColor: utmMaroon,
                   value: _notifyPush,
                   onChanged: (val) => setState(() => _notifyPush = val),
                 ),

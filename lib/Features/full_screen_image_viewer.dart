@@ -17,9 +17,9 @@ class FullScreenImageViewer extends StatelessWidget {
       ),
       body: Center(
         child: InteractiveViewer(
-          panEnabled: true, // Let them pan around
+          panEnabled: true, // Allows pan around
           minScale: 1.0,
-          maxScale: 4.0, // Let them zoom in up to 4x
+          maxScale: 4.0, // Allows zoom in up to 4x
           child: Hero(
             tag: heroTag,
             child: Image.network(

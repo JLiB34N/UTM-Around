@@ -9,19 +9,18 @@ class ClubProfile extends StatelessWidget {
 
   const ClubProfile({super.key, required this.clubId});
 
-  // --- UPDATED URL LAUNCHER ---
+  // --- URL LAUNCHER ---
   Future<void> _launchSocialLink(String? urlString) async {
     if (urlString == null || urlString.trim().isEmpty) return;
     
-    // Auto-fix if they forgot the https://
+    // Auto-fix if forgot the https://
     if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
       urlString = 'https://$urlString';
     }
     
     final Uri url = Uri.parse(urlString);
     try {
-      // FIX: We removed 'canLaunchUrl' because modern phones block it by default!
-      // This will forcefully open the browser.
+      // Forcefully open the browser.
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint("Could not launch link: $e");
@@ -93,13 +92,13 @@ class ClubProfile extends StatelessWidget {
                       // --- FOLLOW US SECTION ---
                       Builder(
                         builder: (context) {
-                          // 1. Extract the links
+                          // Extract the links
                           String ig = clubData['ig'] ?? '';
                           String xLink = clubData['x'] ?? '';
                           String fb = clubData['fb'] ?? '';
                           String web = clubData['website'] ?? '';
 
-                          // 2. Hide the entire section if the club left everything blank
+                          // Hide the entire section if the club left everything blank
                           if (ig.isEmpty && xLink.isEmpty && fb.isEmpty && web.isEmpty) {
                             return const SizedBox.shrink(); 
                           }
@@ -175,75 +174,83 @@ class ClubProfile extends StatelessWidget {
                         var doc = events[index];
                         var data = doc.data() as Map<String, dynamic>;
 
-                        // --- NEW: EXTRACTION LOGIC ---
+                        // --- EXTRACTION LOGIC ---
                         final paymentType = data['paymentType'] ?? 'Free';
                         final bool isPaid = paymentType == 'Paid';
                         final paymentColor = isPaid ? Colors.orange : Colors.green;
                         final paymentIcon = isPaid ? Icons.monetization_on_outlined : Icons.money_off_outlined;
-                        // -----------------------------
 
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.grey[300],
-                            backgroundImage: data['posterUrl'] != null && data['posterUrl'].toString().isNotEmpty ? NetworkImage(data['posterUrl']) : null,
-                            child: data['posterUrl'] == null || data['posterUrl'].toString().isEmpty ? const Icon(Icons.event, color: Colors.grey) : null,
-                          ),
-                          title: Text(data['title'] ?? 'Untitled', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                "${data['date'] ?? 'TBA'} • ${data['time'] ?? 'TBA'} - ${data['endTime'] ?? 'TBA'}",
-                                style: const TextStyle(fontSize: 12, color: Colors.black87),
-                              ),
-                              const SizedBox(height: 4),
-                              
-                              // --- UPDATED: Mode + Category + Payment Badge ---
-                              Wrap(
-                                spacing: 4,
-                                runSpacing: 4,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(data['mode']?.toString().toUpperCase() ?? 'PHYSICAL', style: const TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  
-                                  if (data['category'] != null && data['category'].toString().isNotEmpty) ...[
-                                    const Text("•", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                                    Text(data['category'].toString().toUpperCase(), style: const TextStyle(color: utmMaroon, fontSize: 11, fontWeight: FontWeight.bold)),
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 2,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(16),
+                            leading: CircleAvatar(
+                              radius: 25,
+                              backgroundColor: Colors.grey[300],
+                              backgroundImage: data['posterUrl'] != null && data['posterUrl'].toString().isNotEmpty ? NetworkImage(data['posterUrl']) : null,
+                              child: data['posterUrl'] == null || data['posterUrl'].toString().isEmpty ? const Icon(Icons.event, color: Colors.grey) : null,
+                            ),
+                            title: Text(data['title'] ?? 'Untitled', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 6),
+                                Text(
+                                  "${data['date'] ?? 'TBA'} • ${data['time'] ?? 'TBA'} - ${data['endTime'] ?? 'TBA'}",
+                                  style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                ),
+                                const SizedBox(height: 8),
+                                
+                                // --- Mode + Category + Payment Badge ---
+                                Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(data['mode']?.toString().toUpperCase() ?? 'PHYSICAL', style: const TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    
+                                    if (data['category'] != null && 
+                                        data['category'].toString().trim().isNotEmpty &&
+                                        data['category'].toString().toLowerCase() != (data['mode']?.toString().toLowerCase() ?? 'physical')) ...[
+                                      
+                                      const Text("•", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                      Text(data['category'].toString().toUpperCase(), style: const TextStyle(color: utmMaroon, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ],
+                                    
+                                    // FREE | PAID BADGE
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      margin: const EdgeInsets.only(left: 4),
+                                      decoration: BoxDecoration(
+                                        color: paymentColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: paymentColor.withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(paymentIcon, size: 10, color: paymentColor[800]),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            paymentType.toUpperCase(),
+                                            style: TextStyle(color: paymentColor[800], fontSize: 9, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ],
-                                  
-                                  // FREE | PAID BADGE
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    margin: const EdgeInsets.only(left: 4),
-                                    decoration: BoxDecoration(
-                                      color: paymentColor.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: paymentColor.withValues(alpha: 0.3)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(paymentIcon, size: 10, color: paymentColor[800]),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          paymentType.toUpperCase(),
-                                          style: TextStyle(color: paymentColor[800], fontSize: 9, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
+                            
+                            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                            onTap: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => EventDetails(eventId: doc.id, eventData: data)));
+                            },
                           ),
-                          
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => EventDetails(eventId: doc.id, eventData: data)));
-                          },
                         );
                       },
                       childCount: events.length,
@@ -251,6 +258,7 @@ class ClubProfile extends StatelessWidget {
                   );
                 },
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 48)),
             ],
           );
         },

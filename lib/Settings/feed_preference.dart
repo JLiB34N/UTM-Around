@@ -115,7 +115,7 @@ class _FeedPreferencesPageState extends State<FeedPreferencesPage> {
                 List<dynamic> tags = data['tag'] ?? [];
                 
                 for (var tag in tags) {
-                  // Normalize: Trim spaces and convert to UPPERCASE
+                  // Trim spaces and convert to UPPERCASE
                   String t = tag.toString().trim().toUpperCase();
                   if (t.isNotEmpty) {
                     tagFrequency[t] = (tagFrequency[t] ?? 0) + 1;

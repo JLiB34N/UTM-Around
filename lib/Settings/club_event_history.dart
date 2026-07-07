@@ -27,7 +27,6 @@ class _ClubEventsPageState extends State<ClubEventHistory> {
     final paymentType = data['paymentType'] ?? 'Free';
     final bool isPaid = paymentType == 'Paid';
     final paymentColor = isPaid ? Colors.orange : Colors.green;
-    // ---------------------------------------
 
     showModalBottomSheet(
       context: context,
@@ -59,12 +58,12 @@ class _ClubEventsPageState extends State<ClubEventHistory> {
                   Text(data['title'] ?? 'No Title', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
 
-                  // --- 1. DYNAMIC TAGS WRAP ---
+                  // --- DYNAMIC TAGS WRAP ---
                   if (data['tag'] != null) ...[
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: (data['tag'] as List).map((tag) {
+                      children: (data['tag'] as List).where((tag) => tag.toString().toLowerCase() != (data['mode']?.toString().toLowerCase() ?? 'physical')).map((tag) {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
@@ -82,7 +81,7 @@ class _ClubEventsPageState extends State<ClubEventHistory> {
                     const SizedBox(height: 12),
                   ],
 
-                  // --- 2. FIXED BADGES (Mode, Fee, Status) ---
+                  // --- BADGES (Mode, Fee, Status) ---
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -147,7 +146,7 @@ class _ClubEventsPageState extends State<ClubEventHistory> {
                     const SizedBox(height: 20),
                   ],
 
-                  // --- CRITICAL: Show Rejection Reason if Rejected ---
+                  // --- Rejection Reason if Rejected ---
                   if (status == 'rejected' && data['rejectionReason'] != null) ...[
                     Container(
                       width: double.infinity,
@@ -524,7 +523,7 @@ class _ClubEventsPageState extends State<ClubEventHistory> {
             );
           }
 
-          // --- NEW: UPDATE LOCATION & LINK DIALOG ---
+          // --- UPDATE LOCATION & LINK DIALOG ---
           Future<void> _showUpdateLocationDialog(BuildContext context, String docId, Map<String, dynamic> data) async {
             final bool isOnline = data['mode'] == 'Online';
             TextEditingController locationController = TextEditingController(text: data['location'] ?? (isOnline ? 'Online Meeting' : ''));

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:utm_around/constant.dart';
 import 'package:utm_around/Features/event_details.dart';
+import 'package:utm_around/Features/notification_service.dart';
 
 class MyRSVP extends StatefulWidget {
   const MyRSVP({super.key});
@@ -58,6 +59,88 @@ class _MyRSVPState extends State<MyRSVP> {
     return null;
   }
 
+  Future<void> _syncNotifications(List<DocumentSnapshot> upcomingEvents) async {
+    if (user == null) return;
+
+    try {
+      DocumentSnapshot userPrefs = await FirebaseFirestore.instance.collection('users').doc(user!.uid).get();
+      var userData = userPrefs.data() as Map<String, dynamic>?;
+      
+      bool notifyPush = userData?['notifyPush'] ?? true;
+      List<dynamic> timings = userData?['notifyTimings'] ?? [30, 60];
+
+      if (!notifyPush) return; 
+
+      for (var doc in upcomingEvents) {
+        var data = doc.data() as Map<String, dynamic>;
+        DateTime? eventDateTime = _parseDate(data['date'] ?? '');
+        
+        String timeStr = data['time'] ?? '';
+        int hour = 0;
+        int minute = 0;
+        
+        if (timeStr.isNotEmpty) {
+          bool isPM = timeStr.toUpperCase().contains('PM');
+          String cleanTime = timeStr.replaceAll(RegExp(r'[^0-9:]'), ''); 
+          List<String> timeParts = cleanTime.split(':');
+          if (timeParts.length >= 2) {
+            hour = int.parse(timeParts[0]);
+            minute = int.parse(timeParts[1]);
+            if (isPM && hour < 12) hour += 12;
+            else if (!isPM && hour == 12) hour = 0;
+          }
+        }
+
+        if (eventDateTime != null) {
+          DateTime exactEventTime = DateTime(eventDateTime.year, eventDateTime.month, eventDateTime.day, hour, minute);
+          
+          if (exactEventTime.isBefore(DateTime.now())) continue;
+
+          String eventTitle = data['title'] ?? 'Your event';
+
+          for (int minutes in timings) {
+            int notificationId = "${doc.id}_$minutes".hashCode.abs();
+
+            String eventTime = data['time'] ?? 'TBA';
+            String location = data['mode'] == 'Online' 
+                ? 'Online' 
+                : (data['location'] ?? 'TBA');
+
+            // Smart Body Text Generator
+            String bodyText;
+            
+            if (minutes <= 0) {
+              bodyText = "Starting NOW! • $eventTime • $location";
+            } else {
+              String timeLabel;
+              if (minutes < 60) {
+                timeLabel = "$minutes minutes";
+              } else if (minutes == 60) {
+                timeLabel = "1 hour";
+              } else if (minutes < 1440) {
+                timeLabel = "${minutes ~/ 60} hours";
+              } else if (minutes == 1440) {
+                timeLabel = "1 day";
+              } else {
+                timeLabel = "${minutes ~/ 1440} days";
+              }
+              bodyText = "Starts in $timeLabel • $eventTime • $location";
+            }
+
+            await NotificationService().scheduleNotification(
+              id: notificationId,
+              title: "Reminder: $eventTitle",
+              body: bodyText, // Use the dynamically generated body text
+              scheduledTime: exactEventTime.subtract(Duration(minutes: minutes)),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Silent Sync Failed: $e");
+    }
+  }
+
   // Reusable widget to build the list of events
   Widget _buildEventList(List<DocumentSnapshot> events, String emptyMessage) {
     if (events.isEmpty) {
@@ -80,12 +163,10 @@ class _MyRSVPState extends State<MyRSVP> {
         var doc = events[index];
         var data = doc.data() as Map<String, dynamic>;
 
-        // --- NEW: EXTRACTION LOGIC ---
         final paymentType = data['paymentType'] ?? 'Free';
         final bool isPaid = paymentType == 'Paid';
         final paymentColor = isPaid ? Colors.orange : Colors.green;
         final paymentIcon = isPaid ? Icons.monetization_on_outlined : Icons.money_off_outlined;
-        // -----------------------------
 
         return GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EventDetails(eventId: doc.id, eventData: data))),
@@ -93,7 +174,7 @@ class _MyRSVPState extends State<MyRSVP> {
             margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 2,
-            // 1. Wrap the whole Row in padding so it breathes!
+            // Wrap the whole Row in padding so it breathes!
             child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
@@ -102,7 +183,7 @@ class _MyRSVPState extends State<MyRSVP> {
                     width: 90, height: 90, // Shrunk slightly to account for the new padding
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
-                      // 2. Round ALL corners uniformly
+                      // Round ALL corners uniformly
                       borderRadius: BorderRadius.circular(8), 
                       image: data['posterUrl'] != null && data['posterUrl'].toString().isNotEmpty
                           ? DecorationImage(image: NetworkImage(data['posterUrl']), fit: BoxFit.cover)
@@ -111,12 +192,9 @@ class _MyRSVPState extends State<MyRSVP> {
                     child: data['posterUrl'] == null || data['posterUrl'].toString().isEmpty
                         ? const Icon(Icons.image_not_supported, color: Colors.grey) : null,
                   ),
-                  
-                  // 3. Add a clean gap between the image and the text
                   const SizedBox(width: 16), 
                   
                   Expanded(
-                    // Removed the old Padding here because the outer Row handles it now
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -138,7 +216,7 @@ class _MyRSVPState extends State<MyRSVP> {
                         ),
                         const SizedBox(height: 6),
                         
-                        // --- UPDATED: Mode + Category + Payment Badge ---
+                        // --- Mode + Category + Payment Badge ---
                         Wrap(
                           spacing: 4,
                           runSpacing: 4,
@@ -147,7 +225,7 @@ class _MyRSVPState extends State<MyRSVP> {
                             Icon(data['mode'] == 'Online' ? Icons.video_call : Icons.location_on, size: 14, color: Colors.grey),
                             Text(data['mode']?.toString().toUpperCase() ?? 'PHYSICAL', style: const TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
                             
-                            if (data['category'] != null && data['category'].toString().isNotEmpty) ...[
+                            if (data['category'] != null && data['category'].toString().isNotEmpty && data['category'].toString().toLowerCase() != (data['mode']?.toString().toLowerCase() ?? 'physical')) ...[
                               const Text("•", style: TextStyle(color: Colors.grey, fontSize: 10)),
                               Text(data['category'].toString().toUpperCase(), style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
@@ -175,7 +253,6 @@ class _MyRSVPState extends State<MyRSVP> {
                             ),
                           ],
                         ),
-                        // ------------------------------------------------
                       ],
                     ),
                   ),
@@ -213,7 +290,7 @@ class _MyRSVPState extends State<MyRSVP> {
           ),
         ),
         body: StreamBuilder<QuerySnapshot>(
-          // FIREBASE MAGIC: Find all events where this user's ID is inside the 'attendees' list!
+          // Find all events where this user's ID is inside the 'attendees' list
           stream: FirebaseFirestore.instance.collection('events').where('attendees', arrayContains: user!.uid).snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasError) return const Center(child: Text("Error loading RSVPs."));
@@ -224,13 +301,10 @@ class _MyRSVPState extends State<MyRSVP> {
             List<DocumentSnapshot> upcomingEvents = [];
             List<DocumentSnapshot> pastEvents = [];
 
-            //DateTime todayMidnight = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-
             // 1. Sort into buckets based on the date
             for (var doc in allEvents) {
                 var data = doc.data() as Map<String, dynamic>;
 
-                // --- CHANGED THIS IF STATEMENT ---
                 if (_isEventPassed(data['date'], data['time'])) {
                   pastEvents.add(doc); // Event is dead, send to history
                 } else {
@@ -238,7 +312,7 @@ class _MyRSVPState extends State<MyRSVP> {
                 }
             }
 
-            // 2. Pro-Tip: Sort the lists for the best User Experience!
+            // 2. PSort the lists for the best User Experience
             // Upcoming: Closest date first (Ascending)
             upcomingEvents.sort((a, b) {
               var dataA = a.data() as Map<String, dynamic>;
@@ -246,6 +320,11 @@ class _MyRSVPState extends State<MyRSVP> {
               DateTime dateA = _parseDate(dataA['date'] ?? '') ?? DateTime(2099);
               DateTime dateB = _parseDate(dataB['date'] ?? '') ?? DateTime(2099);
               return dateA.compareTo(dateB);
+            });
+
+            // Silently run the sync function in the background every time the page loads
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _syncNotifications(upcomingEvents);
             });
 
             // History: Most recent past event first (Descending)

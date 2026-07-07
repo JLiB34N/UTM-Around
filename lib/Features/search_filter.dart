@@ -20,19 +20,19 @@ class _SearchPageState extends State<SearchPage> {
 
   // --- SHOW DATE RANGE PICKER ---
   Future<void> _pickDateRange() async {
-    // 1. Grab the current year dynamically!
+    // 1. Grab the current year dynamically
     final int currentYear = DateTime.now().year;
 
     DateTimeRange? picked = await showDateRangePicker(
       context: context,
       initialDateRange: _selectedDateRange,
-      // 2. Future-proof boundaries based on your logic:
+      // 2. Future-proof boundaries 
       firstDate: DateTime(currentYear - 8), // 8 years ago
       lastDate: DateTime(currentYear + 1, 12, 31), // December 31st of next year
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
+            colorScheme: const ColorScheme.light( //auto fill in
               primary: utmMaroon, // Header background color
               onPrimary: Colors.white, // Header text color
               onSurface: Colors.black, // Body text color
@@ -57,7 +57,7 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  // --- NEW: Helper to check if an event is today or in the future ---
+  // --- Helper to check if an event is today or in the future ---
   bool _isUpcoming(String dateStr) {
     try {
       List<String> parts = dateStr.split('/');
@@ -86,11 +86,11 @@ class _SearchPageState extends State<SearchPage> {
         // Convert the event date string into a real DateTime object
         DateTime eventDate = DateTime(year, month, day);
         
-        // Strip the times from our range so we are strictly comparing midnight-to-midnight dates
+        // Strip the times from range to prove strictly comparing midnight-to-midnight dates
         DateTime startDate = DateTime(_selectedDateRange!.start.year, _selectedDateRange!.start.month, _selectedDateRange!.start.day);
         DateTime endDate = DateTime(_selectedDateRange!.end.year, _selectedDateRange!.end.month, _selectedDateRange!.end.day);
 
-        // Does the event fall inside or exactly on the start/end bounds?
+        // Does the event fall inside or exactly on the start/end bounds
         return (eventDate.isAtSameMomentAs(startDate) || eventDate.isAfter(startDate)) && 
                (eventDate.isAtSameMomentAs(endDate) || eventDate.isBefore(endDate));
       }
@@ -118,7 +118,7 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
             child: Column(
               children: [
-                // 1. Text Search Bar
+                // Text Search Bar
                 TextField(
                   onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
                   decoration: InputDecoration(
@@ -132,7 +132,7 @@ class _SearchPageState extends State<SearchPage> {
                 ),
                 const SizedBox(height: 12),
                 
-                // 2. Date Range Filter Button
+                // Date Range Filter Button
                 Row(
                   children: [
                     Expanded(
@@ -149,7 +149,7 @@ class _SearchPageState extends State<SearchPage> {
                         label: Text(
                           _selectedDateRange == null 
                               ? "Filter by Date Range" 
-                              // Format: "12/5 - 15/5/2024" so it fits nicely on the button
+                              // Format: "12/5 - 15/5/2024"
                               : "${_selectedDateRange!.start.day}/${_selectedDateRange!.start.month}  to  ${_selectedDateRange!.end.day}/${_selectedDateRange!.end.month}/${_selectedDateRange!.end.year}",
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -158,7 +158,7 @@ class _SearchPageState extends State<SearchPage> {
                       ),
                     ),
                     
-                    // Show a "Clear" button ONLY if a date range is selected
+                    // Show "Clear" button ONLY if a date range is selected
                     if (_selectedDateRange != null) ...[
                       const SizedBox(width: 8),
                       IconButton(
@@ -171,7 +171,7 @@ class _SearchPageState extends State<SearchPage> {
                 ),
                 const SizedBox(height: 12),
 
-                // --- 3. NEW: MODE & FEE DROPDOWNS ---
+                // --- MODE & FEE DROPDOWNS ---
                 Row(
                   children: [
                     // Mode Dropdown
@@ -219,7 +219,6 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ],
                 ),
-                // ------------------------------------
               ],
             ),
           ),
@@ -247,7 +246,7 @@ class _SearchPageState extends State<SearchPage> {
                   List<dynamic> rawTags = data['tag'] ?? data['tags'] ?? [];
                   String allTagsText = rawTags.join(" ").toLowerCase();
 
-                  // 1. Text Check
+                  // Text Check
                   bool matchesText = title.contains(_searchQuery) || 
                                      location.contains(_searchQuery) || 
                                      allTagsText.contains(_searchQuery); 
@@ -262,10 +261,10 @@ class _SearchPageState extends State<SearchPage> {
                     matchesDate = _matchesDateFilter(eventDateStr);
                   }
 
-                  // 3. Mode Check
+                  // Mode Check
                   bool matchesMode = _selectedMode == 'All Modes' || mode.toLowerCase() == _selectedMode.toLowerCase();
 
-                  // 4. Fee Check
+                  // Fee Check
                   bool matchesPayment = _selectedPayment == 'All Fees' || paymentType.toLowerCase() == _selectedPayment.toLowerCase();
 
                   return matchesText && matchesDate && matchesMode && matchesPayment;
@@ -296,7 +295,6 @@ class _SearchPageState extends State<SearchPage> {
                     final paymentType = data['paymentType'] ?? 'Free';
                     final bool isPaid = paymentType == 'Paid';
                     final paymentColor = isPaid ? Colors.orange : Colors.green;
-                    // -------------------------------
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -331,7 +329,7 @@ class _SearchPageState extends State<SearchPage> {
                             ),
                             const SizedBox(height: 6),
                             
-                            // --- UPDATED: BADGES & TAGS WRAP ---
+                            // --- BADGES & TAGS WRAP ---
                             Wrap(
                               spacing: 6,
                               runSpacing: 4,
@@ -355,7 +353,7 @@ class _SearchPageState extends State<SearchPage> {
                                 ),
                                 // 3. Dynamic Tags (Limit to 2 so the card doesn't get huge)
                                 if (data['tag'] != null)
-                                  ...((data['tag'] as List).take(2).map((tag) {
+                                  ...((data['tag'] as List).where((tag) => tag.toString().toLowerCase() != (data['mode']?.toString().toLowerCase() ?? 'physical')).take(2).map((tag) {
                                     return Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(color: utmMaroon.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
@@ -364,7 +362,6 @@ class _SearchPageState extends State<SearchPage> {
                                   })),
                               ],
                             ),
-                            // ------------------------------------
                           ],
                         ),
                         trailing: const Icon(Icons.chevron_right, color: Colors.grey),

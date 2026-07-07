@@ -22,27 +22,27 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         
-        // 2. User is logged in!
+        // 2. User is logged in
         if (authSnapshot.hasData && authSnapshot.data != null) {
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance.collection('users').doc(authSnapshot.data!.uid).get(),
             builder: (context, userSnapshot) {
               
-              // 1. Waiting state
+              // Waiting state
               if (userSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator(color: utmMaroon)),
                 );
               }
 
-              // 2. Error state (just in case the database is unreachable)
+              // Error state (just in case the database is unreachable)
               if (userSnapshot.hasError) {
                 return const Scaffold(
                   body: Center(child: Text("Error loading profile. Please restart the app.")),
                 );
               }
               
-              // 3. Document EXISTS (Check role and route/block)
+              // Document EXISTS (Check role and route/block)
               if (userSnapshot.hasData && userSnapshot.data!.exists) {
                 String role = userSnapshot.data!['role'] ?? 'student';
                 
@@ -74,11 +74,11 @@ class AuthWrapper extends StatelessWidget {
                   );
                 }
                 
-                // If they are a student or club, let them in!
+                // If they are a student or club, let them in
                 return const DashboardScreen(); 
               }
               
-              // 4. Document DOES NOT EXIST (First time logging in)
+              // Document DOES NOT EXIST (First time logging in)
               if (userSnapshot.hasData && !userSnapshot.data!.exists) {
                  FirebaseFirestore.instance.collection('users').doc(authSnapshot.data!.uid).set({
                   'role': 'student',
@@ -94,7 +94,6 @@ class AuthWrapper extends StatelessWidget {
                 return const DashboardScreen(); 
               }
 
-              // 5. THE CATCH-ALL FALLBACK (This fixes your error!)
               // If literally none of the above match, just show a loading spinner.
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator(color: utmMaroon)),

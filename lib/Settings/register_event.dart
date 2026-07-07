@@ -76,7 +76,7 @@ class _RegisterEventState extends State<RegisterEvent> {
   Future<void> _pickImage() async {
     final XFile? pickedFile = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 70, // Compresses the image so it doesn't eat up your Firebase quota!
+      imageQuality: 70, // Compresses the image so it doesn't eat up Firebase quota
     );
 
     if (pickedFile != null) {
@@ -126,8 +126,6 @@ class _RegisterEventState extends State<RegisterEvent> {
     }
   }
 
-  // --- SUBMIT TO FIRESTORE ---
-  // --- SUBMIT TO FIRESTORE & STORAGE ---
   // --- SUBMIT TO FIRESTORE & STORAGE ---
   Future<void> _submitEvent() async {
     if (!_formKey.currentState!.validate() || _selectedDate == null || _selectedTime == null || _endTime == null || _posterImage == null) {
@@ -135,7 +133,7 @@ class _RegisterEventState extends State<RegisterEvent> {
       return;
     }
 
-    // If it's an online event, force 'Online' into the tags!
+    // If it's an online event, force 'Online' into the tags
     if (_eventMode == 'Online' && !_selectedTags.contains('Online')) {
       _selectedTags.add('Online');
     }
@@ -145,7 +143,7 @@ class _RegisterEventState extends State<RegisterEvent> {
       _selectedTags.add('General');
     }
 
-    // 1. MUST UNCOMMENT THIS! This disables the button so you can't double-tap it
+    // 1. Disables the button so user can't double-tap it
     setState(() => _isSubmitting = true);
 
     try {
@@ -192,9 +190,6 @@ class _RegisterEventState extends State<RegisterEvent> {
       // Fetch the URL
       posterUrl = await storageRef.getDownloadURL();
       print("🔗 URL RECEIVED: $posterUrl");
-
-      // // Wait for the upload to completely finish
-      // await storageRef.putFile(_posterImage!);
 
       // 4. Save to Firestore
       await FirebaseFirestore.instance.collection('events').add({
@@ -342,7 +337,7 @@ class _RegisterEventState extends State<RegisterEvent> {
               ),
               const SizedBox(height: 20),
 
-              // --- NEW: FREE OR PAID TOGGLE ---
+              // --- FREE OR PAID TOGGLE ---
               const Text("Event Fee", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               Row(
@@ -436,7 +431,7 @@ class _RegisterEventState extends State<RegisterEvent> {
               ),
               const SizedBox(height: 12),
               
-              // 2. Allow them to type custom tags!
+              // 2. Allow them to type custom tags
               Row(
                 children: [
                   Expanded(
@@ -660,7 +655,7 @@ class _RegisterEventState extends State<RegisterEvent> {
                               flex: 4,
                               child: TextFormField(
                                 controller: _contactControllers[index]['phone'],
-                                keyboardType: TextInputType.phone, // Opens the number pad!
+                                keyboardType: TextInputType.phone, // Opens the number pad
                                 validator: (val) => val == null || val.isEmpty ? "Required" : null,
                                 decoration: const InputDecoration(hintText: "Phone (e.g. 0123456789)", isDense: true),
                               ),

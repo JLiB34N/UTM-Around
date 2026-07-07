@@ -3,11 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:utm_around/constant.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:utm_around/Features/club_profile.dart';
+import 'package:utm_around/Settings/club_profile.dart';
 import 'package:utm_around/Features/notification_service.dart';
 import 'package:utm_around/Features/full_screen_image_viewer.dart'; 
 import 'package:add_2_calendar/add_2_calendar.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+//import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class EventDetails extends StatefulWidget {
   final String eventId;
@@ -28,6 +28,18 @@ class _EventDetailsState extends State<EventDetails> {
   void initState() {
     super.initState();
     _checkRSVPStatus();
+
+    // --- TEMPORARY WHITE BOX TIME PARSING TEST ---
+    print('[WHITE-BOX TEST] Starting Time Parsing Verification...');
+    
+    // Test Case 1: 12:30 PM (Should convert to 12:30 in 24-hour format)
+    DateTime? testPM = _getEventDateTime("25/06/2026", "12:30 PM");
+    print('[WHITE-BOX TEST] Input: "12:30 PM" -> Converted to DateTime: $testPM');
+
+    // Test Case 2: 12:30 AM (Should convert to 00:30 in 24-hour format)
+    DateTime? testAM = _getEventDateTime("25/06/2026", "12:30 AM");
+    print('[WHITE-BOX TEST] Input: "12:30 AM" -> Converted to DateTime: $testAM');
+    // ---------------------------------------------
   }
 
   // --- CHECK IF USER IS ALREADY GOING ---
@@ -60,10 +72,10 @@ class _EventDetailsState extends State<EventDetails> {
       int month = int.parse(dateParts[1]);
       int year = int.parse(dateParts[2]);
 
-      // --- UPGRADED TIME PARSING LOGIC ---
+      // --- TIME PARSING LOGIC ---
       bool isPM = timeStr.toUpperCase().contains('PM');
       
-      // Now clean the string
+      // Clean the string
       String cleanTime = timeStr.replaceAll(RegExp(r'[^0-9:]'), ''); 
       List<String> timeParts = cleanTime.split(':');
       
@@ -74,7 +86,7 @@ class _EventDetailsState extends State<EventDetails> {
         hour = int.parse(timeParts[0]);
         minute = int.parse(timeParts[1]);
         
-        // Convert to 24-hour format so Firebase understands exactly when it is!
+        // Convert to 24-hour format so Firebase understands exactly when it is
         if (isPM && hour < 12) {
           hour += 12; // 2 PM becomes 14
         } else if (!isPM && hour == 12) {
@@ -88,7 +100,7 @@ class _EventDetailsState extends State<EventDetails> {
     }
   }
 
-  // --- NEW: ADD TO DEVICE CALENDAR ---
+  // --- ADD TO DEVICE CALENDAR ---
   void _addToCalendar() {
     var data = widget.eventData;
     
@@ -144,44 +156,46 @@ class _EventDetailsState extends State<EventDetails> {
         
         // 3. Schedule the specific Push Notifications
         DateTime? eventDateTime = _getEventDateTime(widget.eventData['date'] ?? '', widget.eventData['time'] ?? '');
-        
-        // // --- 15-SECOND SCHEDULER TEST ---
-        // try {
-        //   DateTime testTime = DateTime.now().add(const Duration(seconds: 15));
-        //   print("🕒 SCHEDULING 15-SEC TEST FOR: $testTime");
-          
-        //   await NotificationService().scheduleNotification(
-        //     id: 77777,
-        //     title: "Scheduler is Alive!",
-        //     body: "The time machine works perfectly.",
-        //     scheduledTime: testTime,
-        //   );
-        // } catch (e) {
-        //   print("🕒 SCHEDULER FAILED: $e");
-        // }
 
         if (eventDateTime != null && notifyPush) {
           String eventTitle = widget.eventData['title'] ?? 'Your event';
           
+          print('[DEBUG] Generating notification IDs for event: ${widget.eventId}');
           for (int minutes in timings) {
             // Generate a unique ID for this specific event and timing
             int notificationId = "${widget.eventId}_$minutes".hashCode.abs();
+            print('[DEBUG] Scheduling notification ID: $notificationId for $minutes minutes prior.');
             
-            String timeLabel = "";
-            if (minutes == 30) {
-              timeLabel = "30 minutes";
-            } else if (minutes == 60) {
-              timeLabel = "1 hour";
-            } else if (minutes == 1440) {
-              timeLabel = "1 day";
-            } else if (minutes == 4320) {
-              timeLabel = "3 days";
+            String eventTime = widget.eventData['time'] ?? 'TBA';
+            String location = widget.eventData['mode'] == 'Online' 
+                ? 'Online' 
+                : (widget.eventData['location'] ?? 'TBA');
+
+            // Smart Body Text Generator
+            String bodyText;
+            
+            if (minutes <= 0) {
+              bodyText = "Starting NOW! • $eventTime • $location";
+            } else {
+              String timeLabel;
+              if (minutes < 60) {
+                timeLabel = "$minutes minutes";
+              } else if (minutes == 60) {
+                timeLabel = "1 hour";
+              } else if (minutes < 1440) {
+                timeLabel = "${minutes ~/ 60} hours";
+              } else if (minutes == 1440) {
+                timeLabel = "1 day";
+              } else {
+                timeLabel = "${minutes ~/ 1440} days";
+              }
+              bodyText = "Starts in $timeLabel • $eventTime • $location";
             }
 
             await NotificationService().scheduleNotification(
               id: notificationId,
               title: "Reminder: $eventTitle",
-              body: "This event is starting in $timeLabel!",
+              body: bodyText, // Use the dynamically generated body text
               scheduledTime: eventDateTime.subtract(Duration(minutes: minutes)),
             );
           }
@@ -198,7 +212,7 @@ class _EventDetailsState extends State<EventDetails> {
               action: SnackBarAction(
                 label: "Add",
                 textColor: Colors.white,
-                onPressed: _addToCalendar, // Triggers the calendar!
+                onPressed: _addToCalendar, // Triggers the calendar
               ),
             )
           );
@@ -210,7 +224,10 @@ class _EventDetailsState extends State<EventDetails> {
         
         // Cancel all possible notifications for this event just to be safe
         List<int> allPossibleTimings = [30, 60, 1440, 4320];
+        print('[DEBUG] Canceling all notification IDs for event: ${widget.eventId}');
         for (int minutes in allPossibleTimings) {
+          int notificationId = "${widget.eventId}_$minutes".hashCode.abs();
+          print('[DEBUG] Removing notification ID from queue: $notificationId');
           NotificationService().cancelNotification("${widget.eventId}_$minutes".hashCode);
         }
 
@@ -258,7 +275,7 @@ class _EventDetailsState extends State<EventDetails> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      // 1. STICKY BOTTOM RSVP BUTTON
+      // STICKY BOTTOM RSVP BUTTON
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -287,7 +304,7 @@ class _EventDetailsState extends State<EventDetails> {
         ),
       ),
       
-      // 2. SCROLLABLE CONTENT WITH HERO IMAGE
+      // SCROLLABLE CONTENT WITH HERO IMAGE
       body: CustomScrollView(
         slivers: [
           // The collapsing poster image
@@ -298,7 +315,7 @@ class _EventDetailsState extends State<EventDetails> {
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
               background: data['posterUrl'] != null && data['posterUrl'].toString().isNotEmpty
-                  // --- NEW: GESTURE DETECTOR & HERO ---
+                  // --- GESTURE DETECTOR & HERO ---
                   ? GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -306,7 +323,7 @@ class _EventDetailsState extends State<EventDetails> {
                           MaterialPageRoute(
                             builder: (context) => FullScreenImageViewer(
                               imageUrl: data['posterUrl'],
-                              heroTag: 'poster_${widget.eventId}', // Link to this specific event!
+                              heroTag: 'poster_${widget.eventId}', // Link to this specific event
                             ),
                           ),
                         );
@@ -316,7 +333,6 @@ class _EventDetailsState extends State<EventDetails> {
                         child: Image.network(data['posterUrl'], fit: BoxFit.cover),
                       ),
                     )
-                  // ------------------------------------
                   : Container(
                       color: utmMaroon.withValues(alpha: 0.8),
                       child: const Center(child: Icon(Icons.event, color: Colors.white, size: 80)),
@@ -331,12 +347,12 @@ class _EventDetailsState extends State<EventDetails> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Multiple Tags Wrap
+                  // Multiple Tags Wrap
                   if (data['tag'] != null) ...[
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: (data['tag'] as List).map((tag) {
+                      children: (data['tag'] as List).where((tag) => tag.toString().toLowerCase() != (data['mode']?.toString().toLowerCase() ?? 'physical')).map((tag) {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
@@ -354,7 +370,7 @@ class _EventDetailsState extends State<EventDetails> {
                     const SizedBox(height: 12),
                   ],
 
-                  // 2. FIXED BADGES ROW (MODE & FEE STATUS)
+                  // FIXED BADGES ROW (MODE & FEE STATUS)
                   Row(
                     children: [
                       // Mode Badge (Physical / Online)
@@ -457,7 +473,7 @@ class _EventDetailsState extends State<EventDetails> {
                     const SizedBox(height: 16),
                   ],
 
-                  // --- UPDATED: PAID EVENT NOTICE BANNER ---
+                  // --- PAID EVENT NOTICE BANNER ---
                   if (data['paymentType'] == 'Paid') ...[
                     Container(
                       width: double.infinity,
@@ -506,7 +522,7 @@ class _EventDetailsState extends State<EventDetails> {
                         
                         return GestureDetector(
                           onTap: () {
-                            // Navigate to the new Club Profile Page!
+                            // Navigate to the Club Profile Page
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => ClubProfile(clubId: data['clubId'])),
@@ -580,7 +596,7 @@ class _EventDetailsState extends State<EventDetails> {
                           subtitle: Text(contact['phone'] ?? ''),
                           trailing: IconButton(
                             icon: const Icon(Icons.call, color: Colors.green),
-                            onPressed: () => _makePhoneCall(contact['phone'] ?? ''), // Launches dialer!
+                            onPressed: () => _makePhoneCall(contact['phone'] ?? ''), // Launches dialer
                           ),
                         ),
                       );

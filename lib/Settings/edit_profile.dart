@@ -53,7 +53,7 @@ class _EditProfileState extends State<EditProfile> {
       if (doc.exists) {
         var data = doc.data() as Map<String, dynamic>;
         setState(() {
-          _userRole = data['role'] ?? 'student'; // Get role
+          _userRole = data['role'] ?? 'student'; 
           _nameController.text = data['name'] ?? '';
           _phoneController.text = data['phone'] ?? '';
           _existingProfilePicUrl = data['profilePic'];
@@ -85,7 +85,7 @@ class _EditProfileState extends State<EditProfile> {
   Future<void> _pickImage() async {
     final XFile? pickedFile = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 50, // High compression because avatars are small!
+      imageQuality: 50, // High compression because avatars are small
     );
 
     if (pickedFile != null) {
@@ -107,9 +107,9 @@ class _EditProfileState extends State<EditProfile> {
     try {
       String? finalPicUrl = _existingProfilePicUrl;
 
-      // 1. If they picked a new image, upload it first!
+      // 1. If picked a new image, upload it first
       if (_profileImage != null) {
-        // We use their UID as the filename. This automatically overwrites their old picture!
+        // Uses their UID as the filename. This automatically overwrites their old picture
         String fileName = 'profile_pictures/${user!.uid}.jpg';
         Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
         
@@ -119,7 +119,6 @@ class _EditProfileState extends State<EditProfile> {
       }
 
       // 2. Save text data and image URL to Firestore
-      // Change the Firestore update block to this:
       Map<String, dynamic> updateData = {
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
@@ -190,7 +189,7 @@ class _EditProfileState extends State<EditProfile> {
                     CircleAvatar(
                       radius: 55,
                       backgroundColor: utmMaroon.withValues(alpha: 0.1),
-                      // Logic: Show the newly picked file OR the old network image OR nothing
+                      // Show the newly picked file OR the old network image OR nothing
                       backgroundImage: _profileImage != null 
                           ? FileImage(_profileImage!) as ImageProvider
                           : (_existingProfilePicUrl != null && _existingProfilePicUrl!.isNotEmpty
@@ -332,7 +331,7 @@ class _EditProfileState extends State<EditProfile> {
               ),
               const SizedBox(height: 24),
 
-              // 2. Year & Programme Code TextField
+              // Year & Programme Code TextField
               const Text("Year & Programme Code", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               TextField(
@@ -347,7 +346,7 @@ class _EditProfileState extends State<EditProfile> {
               ),
               const SizedBox(height: 24),
 
-              // 3. NEW: Residential Area Dropdown
+              // Residential Area Dropdown
               const Text("Residential Area", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 8),
               Container(
@@ -369,7 +368,7 @@ class _EditProfileState extends State<EditProfile> {
 
             const SizedBox(height: 24),
 
-            // --- SAVE BUTTON ---
+            // BUTTON
             SizedBox(
               width: double.infinity,
               height: 55,

@@ -1,10 +1,8 @@
-// lib/login_page.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
-const Color utmMaroon = Color(0xFF981D2D);
+import '../constant.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -27,7 +25,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     
-    // New initialization with the Server Client ID
+    // Initialization with the Server Client ID
     _googleSignIn.initialize(serverClientId: '939798559504-gk624ou4b1ht4sqfcj8ld20gdmrqpcav.apps.googleusercontent.com'); //server client ID
   }
 
@@ -57,10 +55,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         idToken: googleAuth.idToken,
       );
         
-      // 7. Sign into Firebase
+      // Sign into Firebase
       UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
         
-      // 8. Create the role in Firestore if they are a new student
+      // Create the role in Firestore if they are a new student
       DocumentReference userDoc = FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid);
       var doc = await userDoc.get();
       if (!doc.exists) {
@@ -98,18 +96,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => _isLoading = true);
 
     try {
-      // 1. Tell Firebase Auth to log them in
+      // Tell Firebase Auth to log them in
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
       
-      // 2. You don't need to do anything else! 
       // The auth_wrapper is already listening and will automatically 
       // send them to the Dashboard based on their role!
 
     } on FirebaseAuthException catch (e) {
-      // 1. Mount check
+      // Mount check
       if (!mounted) return;
 
       // Handle wrong password, user not found, etc.

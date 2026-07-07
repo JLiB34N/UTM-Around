@@ -13,10 +13,8 @@ class MainFeed extends StatefulWidget {
 
 class _MainFeedState extends State<MainFeed> {
   final User? user = FirebaseAuth.instance.currentUser;
-  // 1. ADD THIS VARIABLE
   List<String> _userPreferredTags = [];
 
-  // 2. ADD INITSTATE AND FETCH FUNCTION
   @override
   void initState() {
     super.initState();
@@ -36,21 +34,6 @@ class _MainFeedState extends State<MainFeed> {
       }
     }
   }
-  // // Helper to check if an event is in the future
-  // bool _isUpcoming(String dateStr) {
-  //   try {
-  //     List<String> parts = dateStr.split('/');
-  //     if (parts.length == 3) {
-  //       DateTime eventDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
-  //       DateTime todayMidnight = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-  //       // Returns true if the event is today or in the future
-  //       return !eventDate.isBefore(todayMidnight); 
-  //     }
-  //   } catch (e) {
-  //     return false; // If date is broken, hide it to be safe
-  //   }
-  //   return false;
-  // }
 
   bool _isEventPassed(String? dateStr, String? timeStr) {
     if (dateStr == null || dateStr.isEmpty) return false;
@@ -72,8 +55,12 @@ class _MainFeedState extends State<MainFeed> {
         if (timeParts.length >= 2) {
           hour = int.parse(timeParts[0]);
           minute = int.parse(timeParts[1]);
-          if (isPM && hour < 12) hour += 12;
-          else if (!isPM && hour == 12) hour = 0;
+          if (isPM && hour < 12) {
+            hour += 12;
+          }
+          else if (!isPM && hour == 12) {
+            hour = 0;
+          }
         }
       }
 
@@ -142,13 +129,12 @@ class _MainFeedState extends State<MainFeed> {
                   var data = doc.data() as Map<String, dynamic>;
                   String status = data['status'] ?? 'pending';
                   
-                  // ONLY keep it if it is Approved AND hasn't happened yet!
-                  // --- CHANGED THIS LINE ---
+                  // ONLY keep it if it is Approved AND hasn't happened yet
                   return status == 'approved' && !_isEventPassed(data['date'], data['time']);
                 }).toList();
 
                 // --- SUPER-SORTING LOGIC ---
-                // Put preferred events at the top, then sort by newest!
+                // Put preferred events at the top, then sort by newest
                 approvedUpcomingEvents.sort((a, b) {
                   var dataA = a.data() as Map<String, dynamic>;
                   var dataB = b.data() as Map<String, dynamic>;
@@ -170,7 +156,7 @@ class _MainFeedState extends State<MainFeed> {
                     if (!aHasPreferred && bHasPreferred) return 1; // B moves up
                   }
 
-                  // 4. TIE-BREAKER: If both are preferred (or neither are), sort by newest!
+                  // 4. TIE-BREAKER: If both are preferred (or neither are), sort by newest
                   Timestamp? timeA = dataA['createdAt'] as Timestamp?;
                   Timestamp? timeB = dataB['createdAt'] as Timestamp?;
                   
@@ -179,7 +165,6 @@ class _MainFeedState extends State<MainFeed> {
                   }
                   return 0; 
                 });
-                // --------------------------------
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -189,24 +174,23 @@ class _MainFeedState extends State<MainFeed> {
                     var data = doc.data() as Map<String, dynamic>;
 
                     // --- CORRECT LOCATION FOR EXTRACTION LOGIC ---
-                    // This logic now runs once per item, making the variables available for the Card!
+                    // This logic now runs once per item, making the variables available for the Card
                     // Extract paymentType and define style locally
                     // Use modern green for Free and Orange for Paid to align with standard UI patterns
                     final paymentType = data['paymentType'] ?? 'Free'; // Default to free for safety/legacy events
                     final bool isPaid = paymentType == 'Paid';
                     final paymentColor = isPaid ? Colors.orange : Colors.green;
                     final paymentIcon = isPaid ? Icons.monetization_on_outlined : Icons.money_off_outlined;
-                    // ---------------------------------------------
 
                     return GestureDetector(
                       onTap: () {
-                        // Navigate to the Details Page, passing the specific Document ID and Data!
+                        // Navigate to the Details Page, passing the specific Document ID and Data
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => EventDetails(
-                              eventId: doc.id, // We need this to save the RSVP in the right place
-                              eventData: data, // We pass the data so the next page loads instantly!
+                              eventId: doc.id, // Need this to save the RSVP in the right place
+                              eventData: data, // Passes the data so the next page loads instantly
                             ),
                           ),
                         );
@@ -237,22 +221,20 @@ class _MainFeedState extends State<MainFeed> {
                                 child: const Icon(Icons.event, color: utmMaroon, size: 50),
                               ),
 
-                            // 2. EVENT DETAILS
+                            // --- EVENT DETAILS ---
                             Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // --- UPDATED: Switched from Row to Wrap to gracefully handle potential overflow with the new badge ---
                                   Wrap(
                                     spacing: 8, // Horizontal spacing between badges
                                     runSpacing: 4, // Vertical spacing if it wraps to a new line
                                     crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      // --- ONLY SHOW CATEGORY IF IT ACTUALLY EXISTS ---
+                                      // ONLY SHOW CATEGORY IF IT ACTUALLY EXISTS
                                       if (data['category'] != null && data['category'].toString().trim().isNotEmpty)
                                         Container(
-                                          // Note: The margin is now handled by the 'spacing' prop of the parent Wrap widget!
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: utmMaroon.withValues(alpha: 0.1),
@@ -264,7 +246,7 @@ class _MainFeedState extends State<MainFeed> {
                                           ),
                                         ),
                                         
-                                      // Mode Tag (Physical/Online)
+                                      // --- Mode Tag (Physical/Online) ---
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
@@ -277,7 +259,7 @@ class _MainFeedState extends State<MainFeed> {
                                         ),
                                       ),
 
-                                      // --- THE NEW PAYMENT TYPE BADGE (It works now!) ---
+                                      // --- PAYMENT TYPE BADGE ---
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
@@ -297,12 +279,11 @@ class _MainFeedState extends State<MainFeed> {
                                           ],
                                         ),
                                       ),
-                                      // --------------------------------------------------
                                     ],
                                   ),
                                   const SizedBox(height: 8),
                                   
-                                  // Title
+                                  // --- Title ---
                                   Text(
                                     data['title'] ?? 'Untitled Event',
                                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -311,7 +292,7 @@ class _MainFeedState extends State<MainFeed> {
                                   ),
                                   const SizedBox(height: 12),
                                   
-                                  // Date & Time (End time has been added for completeness)
+                                  // --- Date & Time ---
                                   Row(
                                     children: [
                                       const Icon(Icons.access_time, size: 16, color: Colors.grey),
@@ -327,7 +308,7 @@ class _MainFeedState extends State<MainFeed> {
                                   ),
                                   const SizedBox(height: 6),
                                   
-                                  // Location (Now dynamically changes icon if Online)
+                                  // --- Location ---
                                   Row(
                                     children: [
                                       Icon(

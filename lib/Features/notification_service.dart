@@ -14,10 +14,10 @@ class NotificationService {
     // Initialize TimeZones
     tz.initializeTimeZones();
 
-    // 2. Fetch the TimeZoneInfo object from the device
+    // Fetch the TimeZoneInfo object from the device
     final TimezoneInfo currentTimeZone = await FlutterTimezone.getLocalTimezone();
 
-    // 3. Extract the string identifier (e.g., "Asia/Kuala_Lumpur") and set the location!
+    // Extract the string identifier (e.g., "Asia/Kuala_Lumpur") and set the location!
     tz.setLocalLocation(tz.getLocation(currentTimeZone.identifier));
 
     // Android Setup
@@ -55,19 +55,18 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
   }) async {
-    // If the time has already passed, don't schedule it!
+    // If the time has already passed, don't schedule it
     if (scheduledTime.isBefore(DateTime.now())) return;
 
-    // --- ADD THIS TO FIX THE ANDROID 12+ CRASH ---
+    // --- FIX THE ANDROID 12+ CRASH ---
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
         flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidImplementation != null) {
-      // This asks Android for the exact alarm permission if it doesn't have it yet
+      // Asks Android for the exact alarm permission if it doesn't have it yet
       await androidImplementation.requestExactAlarmsPermission();
     }
-    // ----------------------------------------------
 
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id: id, 
@@ -76,12 +75,12 @@ class NotificationService {
       scheduledDate: tz.TZDateTime.from(scheduledTime, tz.local),
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'event_reminders_v2', // <--- THE MAGIC FIX: A brand new channel ID!
-          'Event Reminders',
+          'event_reminders_v2', //id
+          'Event Reminders', //name
           channelDescription: 'Reminders for your upcoming events',
           importance: Importance.max,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher', // Make sure this is here just in case!
+          icon: '@mipmap/ic_launcher', 
         ),
         iOS: DarwinNotificationDetails(),
       ),
@@ -89,7 +88,7 @@ class NotificationService {
     );
   }
 
-  // Cancel Notifications (When they cancel RSVP)
+  // Cancel Notifications (When cancel RSVP)
   Future<void> cancelNotification(int id) async {
     await flutterLocalNotificationsPlugin.cancel(id: id);
   }

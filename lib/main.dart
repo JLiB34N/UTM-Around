@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:utm_around/Login/auth_wrapper.dart';
-import 'Features/notification_service.dart';
+import 'Features/notification_service.dart'; 
 import 'constant.dart';
 
 void main() async {
   // Required to ensure Flutter framework is fully loaded before initializing Firebase
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase (Make sure you've added google-services.json to your android/app folder!)
+  // Initialize Firebase 
   await Firebase.initializeApp();
 
   // Initialize Notifications
@@ -25,7 +25,6 @@ class UTMAroundApp extends StatelessWidget {
     return MaterialApp(
       title: 'UTM Around',
       
-      // Set this to false cuz examiners hate seeing the "DEBUG" banner during a demo!
       debugShowCheckedModeBanner: false, 
       
       // Global Theme Settings

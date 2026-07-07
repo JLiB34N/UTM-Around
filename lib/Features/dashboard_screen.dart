@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'main_feed_page.dart'; 
-import 'settings.dart'; 
+import 'package:utm_around/Settings/settings.dart'; 
 import 'search_filter.dart'; 
 import 'package:utm_around/constant.dart';
 
@@ -12,10 +12,10 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // 1. Keep track of which tab is selected (0 = Home, 1 = Search, 2 = Settings)
+  // Keep track of which tab is selected (0 = Home, 1 = Search, 2 = Settings)
   int _currentIndex = 0;
 
-  // 2. List of the actual pages to display
+  // List of the actual pages to display
   final List<Widget> _pages = [
     const MainFeed(),
     const SearchPage(),
@@ -25,10 +25,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 3. The body simply shows the page at the current index
+      // Body simply shows the page at the current index
       body: _pages[_currentIndex],
       
-      // 4. The Bottom Bar
+      // Bottom Bar
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
